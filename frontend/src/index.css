@@ -1,0 +1,155 @@
+@import "tailwindcss";
+@import "highlight.js/styles/github-dark-dimmed.css";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  --background: hsl(0, 0%, 100%);
+  --foreground: hsl(240, 10%, 3.9%);
+  --card: hsl(0, 0%, 100%);
+  --card-foreground: hsl(240, 10%, 3.9%);
+  --popover: hsl(0, 0%, 100%);
+  --popover-foreground: hsl(240, 10%, 3.9%);
+  --primary: hsl(240, 5.9%, 10%);
+  --primary-foreground: hsl(0, 0%, 98%);
+  --secondary: hsl(240, 4.8%, 95.9%);
+  --secondary-foreground: hsl(240, 5.9%, 10%);
+  --muted: hsl(240, 4.8%, 95.9%);
+  --muted-foreground: hsl(240, 3.8%, 46.1%);
+  --accent: hsl(240, 4.8%, 95.9%);
+  --accent-foreground: hsl(240, 5.9%, 10%);
+  --destructive: hsl(0, 84.2%, 60.2%);
+  --border: hsl(240, 5.9%, 90%);
+  --input: hsl(240, 5.9%, 90%);
+  --ring: hsl(240, 10%, 3.9%);
+  --radius: 0.5rem;
+}
+
+.dark {
+  --background: hsl(240, 10%, 3.9%);
+  --foreground: hsl(0, 0%, 98%);
+  --card: hsl(240, 10%, 3.9%);
+  --card-foreground: hsl(0, 0%, 98%);
+  --popover: hsl(240, 10%, 3.9%);
+  --popover-foreground: hsl(0, 0%, 98%);
+  --primary: hsl(0, 0%, 98%);
+  --primary-foreground: hsl(240, 5.9%, 10%);
+  --secondary: hsl(240, 3.7%, 15.9%);
+  --secondary-foreground: hsl(0, 0%, 98%);
+  --muted: hsl(240, 3.7%, 15.9%);
+  --muted-foreground: hsl(240, 5%, 64.9%);
+  --accent: hsl(240, 3.7%, 15.9%);
+  --accent-foreground: hsl(0, 0%, 98%);
+  --destructive: hsl(0, 62.8%, 30.6%);
+  --border: hsl(240, 3.7%, 15.9%);
+  --input: hsl(240, 3.7%, 15.9%);
+  --ring: hsl(240, 4.9%, 83.9%);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html {
+    scrollbar-color: hsl(240, 3.7%, 45%) var(--background);
+  }
+
+  html::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  html::-webkit-scrollbar-track {
+    background: var(--background);
+  }
+
+  html::-webkit-scrollbar-thumb {
+    background: hsl(240, 3.7%, 45%);
+    border-radius: 9999px;
+    border: 2px solid var(--background);
+  }
+
+  html::-webkit-scrollbar-thumb:hover {
+    background: hsl(240, 5%, 55%);
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Prose 样式 */
+.prose { color: inherit; max-width: none; }
+.prose h1,.prose h2,.prose h3,.prose h4,.prose h5,.prose h6 { color: inherit; scroll-margin-top: 4rem; font-weight: 600; margin-top: 1.5em; margin-bottom: 0.5em; }
+.prose h1 { font-size: 1.875rem; }
+.prose h2 { font-size: 1.5rem; }
+.prose h3 { font-size: 1.25rem; }
+.prose h4 { font-size: 1.125rem; }
+.prose p { margin-bottom: 1em; line-height: 1.75; }
+.prose ul { list-style: disc; padding-left: 1.5em; margin-bottom: 1em; }
+.prose ol { list-style: decimal; padding-left: 1.5em; margin-bottom: 1em; }
+.prose li { margin-bottom: 0.25em; }
+.prose a { color: #3b82f6; text-decoration: underline; }
+.prose a:hover { color: #2563eb; }
+.prose code { background: rgba(0,0,0,0.06); padding: 0.15em 0.4em; border-radius: 4px; font-size: 0.875em; font-family: monospace; }
+.dark .prose code { background: rgba(255,255,255,0.1); }
+.prose pre { background: #1e1e1e; color: #d4d4d4; padding: 1rem; border-radius: 8px; overflow-x: auto; margin-bottom: 1em; }
+.prose pre {
+  scrollbar-color: #52525b #1e1e1e;
+}
+.prose pre::-webkit-scrollbar {
+  height: 10px;
+}
+.prose pre::-webkit-scrollbar-track {
+  background: #1e1e1e;
+}
+.prose pre::-webkit-scrollbar-thumb {
+  background: #52525b;
+  border-radius: 9999px;
+  border: 2px solid #1e1e1e;
+}
+.prose pre::-webkit-scrollbar-thumb:hover {
+  background: #71717a;
+}
+.prose pre code { background: transparent !important; padding: 0; font-size: 0.875em; }
+.dark .prose pre code { background: transparent !important; }
+/* 消除代码块内 span/code 的边框和描边（来自全局 * { border-border } 规则） */
+.prose pre * { border: none !important; outline: none !important; }
+/* 让 highlight.js 自身的背景色透明，由 .prose pre 控制背景 */
+.prose pre code.hljs { background: transparent; }
+.prose blockquote { border-left: 3px solid #d4d4d8; padding-left: 1rem; color: #71717a; font-style: italic; margin: 1em 0; }
+.dark .prose blockquote { border-left-color: #52525b; color: #a1a1aa; }
+.prose table { width: 100%; border-collapse: collapse; margin-bottom: 1em; }
+.prose th,.prose td { border: 1px solid #e4e4e7; padding: 0.5rem 0.75rem; text-align: left; }
+.prose th { background: #f4f4f5; font-weight: 600; }
+.dark .prose th { background: #18181b; }
+.dark .prose th,.dark .prose td { border-color: #3f3f46; }
+.prose img { max-width: 100%; border-radius: 4px; margin: 1em 0; }
+#about .prose img { border-radius: 0.75rem; }
+.prose hr { border-color: var(--border); margin: 2em 0; }
