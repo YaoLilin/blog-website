@@ -112,6 +112,20 @@ VALUES ('PROFILE_IMAGE', '', 'STRING', '个人介绍图片URL');
 INSERT IGNORE INTO system_setting (setting_key, setting_value, setting_type, description)
 VALUES ('PROFILE_CONTENT', '', 'STRING', '个人介绍内容（Markdown）');
 
+-- 项目展示表
+CREATE TABLE IF NOT EXISTS project (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(200) NOT NULL,
+    short_desc VARCHAR(500),
+    description TEXT,
+    link VARCHAR(1000),
+    cover_image VARCHAR(500),
+    sort_order INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_sort_order (sort_order)
+);
+
 -- 网站访问统计表
 CREATE TABLE IF NOT EXISTS site_visit_record (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
