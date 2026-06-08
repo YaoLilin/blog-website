@@ -5,11 +5,13 @@ import com.blog.myblog.dto.CategoryDto;
 import com.blog.myblog.service.ArticleService;
 import com.blog.myblog.service.CategoryService;
 import com.blog.myblog.service.GitService;
-import com.blog.myblog.service.HelpfulVoteService;
 import com.blog.myblog.service.ViewService;
+import com.blog.myblog.util.BrowserRequestDetector;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -22,7 +24,6 @@ public class ArticleController {
 
     private final ArticleService articleService;
     private final ViewService viewService;
-    private final HelpfulVoteService helpfulVoteService;
     private final GitService gitService;
     private final CategoryService categoryService;
 
@@ -78,22 +79,26 @@ public class ArticleController {
     }
 
     @PostMapping("/{id}/view")
-    public ResponseEntity<Void> recordView(@PathVariable Long id) {
+    public ResponseEntity<Void> recordView(
+            @PathVariable Long id,
+            Authentication authentication,
+            HttpServletRequest request) {
+        if (isAdmin(authentication) || !isBrowserRequest(request)) {
+            return ResponseEntity.ok().build();
+        }
         viewService.recordView(id);
         return ResponseEntity.ok().build();
     }
 
-    @PostMapping("/{id}/helpful")
-    public ResponseEntity<Map<String, Object>> recordHelpful(@PathVariable Long id, @RequestBody Map<String, String> body) {
-        String fingerprint = body.getOrDefault("fingerprint", "unknown");
-        boolean voted = helpfulVoteService.vote(id, fingerprint);
-        return ResponseEntity.ok(Map.of("voted", voted));
+    private boolean isAdmin(Authentication authentication) {
+        return authentication != null
+                && authentication.isAuthenticated()
+                && authentication.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_ADMIN".equals(authority.getAuthority()));
     }
 
-    @GetMapping("/{id}/helpful/status")
-    public ResponseEntity<Map<String, Object>> getHelpfulStatus(@PathVariable Long id, @RequestParam String fingerprint) {
-        boolean voted = helpfulVoteService.isVoted(id, fingerprint);
-        return ResponseEntity.ok(Map.of("voted", voted));
+    private boolean isBrowserRequest(HttpServletRequest request) {
+        return BrowserRequestDetector.isBrowserUserAgent(request.getHeader("User-Agent"));
     }
 
     @GetMapping("/{id}/git-remote")

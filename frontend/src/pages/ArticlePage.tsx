@@ -1,17 +1,19 @@
 import { useEffect, useState, useRef, useMemo } from 'react'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
+import { Helmet } from 'react-helmet-async'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
 import rehypeHighlight from 'rehype-highlight'
-import { Calendar, RefreshCw, Eye, Edit, Save, X, ChevronRight, PanelLeftClose, PanelLeftOpen, FileText, ThumbsUp } from 'lucide-react'
+import { Calendar, RefreshCw, Eye, Edit, Save, X, ChevronRight, PanelLeftClose, PanelLeftOpen, FileText } from 'lucide-react'
 import { api } from '../api'
 import type { Article, Category } from '../types'
 import { useAuthStore } from '../stores/authStore'
-import { formatDate, getBrowserFingerprint } from '../lib/utils'
+import { formatDate } from '../lib/utils'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { VditorEditor } from '../components/VditorEditor'
+import { SITE_CONFIG } from '../config/site'
 
 interface TocItem {
   id: string
@@ -122,7 +124,6 @@ export function ArticlePage() {
   const [loading, setLoading] = useState(true)
   const [tocOpen, setTocOpen] = useState(true)
   const [editTitle, setEditTitle] = useState('')
-  const [helpfulVoted, setHelpfulVoted] = useState(false)
   const [gitRemoteUrl, setGitRemoteUrl] = useState('')
   const contentRef = useRef<HTMLDivElement>(null)
   const articleHeaderRef = useRef<HTMLDivElement>(null)
@@ -207,9 +208,7 @@ export function ArticlePage() {
 
   useEffect(() => {
     if (!article) return
-    const blogName = localStorage.getItem('blogName') || ''
-    document.title = article.title + (blogName ? ` - ${blogName}` : '')
-    return () => { document.title = blogName || '' }
+    document.title = article.title
   }, [article])
 
   useEffect(() => {
@@ -218,29 +217,12 @@ export function ArticlePage() {
   }, [article, isAdmin])
 
   useEffect(() => {
-    if (!article) return
-    const fp = getBrowserFingerprint()
-    api.getHelpfulStatus(article.id, fp).then(r => setHelpfulVoted(r.voted)).catch(() => {})
-  }, [article])
-
-  useEffect(() => {
     if (!article || !article.isServerManaged) {
       setGitRemoteUrl('')
       return
     }
     api.getArticleGitRemote(article.id).then(r => setGitRemoteUrl(r.url)).catch(() => {})
   }, [article])
-
-  const handleHelpfulClick = () => {
-    if (!article || helpfulVoted) return
-    const fp = getBrowserFingerprint()
-    api.recordHelpful(article.id, fp).then(r => {
-      if (r.voted) {
-        setHelpfulVoted(true)
-        setArticle({ ...article, helpfulCount: (article.helpfulCount || 0) + 1 })
-      }
-    }).catch(() => {})
-  }
 
   const editFromQuery = searchParams.get('edit') === '1'
 
@@ -429,7 +411,14 @@ export function ArticlePage() {
   if (!article) return <div className="container mx-auto px-4 py-8 text-center text-zinc-400">文章不存在</div>
 
   return (
-    <div className="flex gap-0">
+    <>
+      <Helmet>
+        <title>{article.title} - {SITE_CONFIG.name}</title>
+        <meta name="description" content={article.title} />
+        <meta property="og:title" content={`${article.title} - ${SITE_CONFIG.name}`} />
+        <meta property="og:description" content={article.title} />
+      </Helmet>
+      <div className="flex gap-0">
       {/* 左侧：目录 + 分类导航 */}
       <aside
         className={`shrink-0 sticky top-14 h-[calc(100vh-3.5rem)] border-r border-zinc-200 dark:border-zinc-800 flex flex-col transition-[width] duration-200 overflow-hidden ${
@@ -520,7 +509,6 @@ export function ArticlePage() {
                   <span className="flex items-center gap-1"><RefreshCw size={14} />更新于 {formatDate(article.updatedAt)}</span>
                 )}
                 {isAdmin && <span className="flex items-center gap-1"><Eye size={14} />{article.viewCount} 次阅读</span>}
-                {isAdmin && <span className="flex items-center gap-1"><ThumbsUp size={14} />{article.helpfulCount ?? 0}</span>}
               </div>
             </div>
           ) : (
@@ -539,7 +527,6 @@ export function ArticlePage() {
                   <span className="flex items-center gap-1"><RefreshCw size={14} />更新于 {formatDate(article.updatedAt)}</span>
                 )}
                 {isAdmin && <span className="flex items-center gap-1"><Eye size={14} />{article.viewCount} 次阅读</span>}
-                {isAdmin && <span className="flex items-center gap-1"><ThumbsUp size={14} />{article.helpfulCount ?? 0}</span>}
               </div>
             </>
           )}
@@ -609,23 +596,9 @@ export function ArticlePage() {
           )}
         </div>
 
-        {article && (
-          <div className="shrink-0 pt-3 -translate-y-[100px]">
-            <p className="text-sm text-zinc-900 dark:text-zinc-100 font-medium mb-2">此文章是否有帮助？</p>
-            <button
-              onClick={handleHelpfulClick}
-              className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${
-                helpfulVoted
-                  ? 'text-red-500'
-                  : 'text-zinc-800 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-zinc-100'
-              }`}
-            >
-              <ThumbsUp size={16} className={helpfulVoted ? 'fill-current' : ''} />
-              {helpfulVoted && <span className="text-green-600 dark:text-green-400 ml-1">感谢！</span>}
-            </button>
-          </div>
-        )}
+
       </aside>
     </div>
+    </>
   )
 }

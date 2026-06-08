@@ -1,6 +1,9 @@
+import { useEffect } from 'react'
 import { Link, Outlet, useNavigate, useLocation, Navigate } from 'react-router-dom'
 import { LayoutDashboard, FileText, BarChart2, Settings, GitBranch, LogOut, Workflow, User } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
+import { isTokenExpired } from '../../lib/jwt'
+import { toast } from 'sonner'
 import { cn } from '../../lib/utils'
 
 const menuItems = [
@@ -18,8 +21,16 @@ export function AdminLayout() {
   const navigate = useNavigate()
   const location = useLocation()
 
-  if (!isAdmin) {
-    return <Navigate to="/admin/login" replace state={{ from: `${location.pathname}${location.search}` }} />
+  useEffect(() => {
+    document.title = '后台管理'
+  }, [])
+
+  if (!isAdmin || isTokenExpired()) {
+    if (isAdmin && isTokenExpired()) {
+      logout()
+      toast.error('登录已过期，请重新登录')
+    }
+    return <Navigate to="/admin/login" replace />
   }
 
   return (

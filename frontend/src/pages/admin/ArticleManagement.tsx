@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Folder, FolderOpen, Plus, Search, Edit, Trash2, ArrowLeft, Image as ImageIcon } from 'lucide-react'
+import { Folder, FolderOpen, Plus, Search, Edit, Trash2, ArrowLeft, Image as ImageIcon, RefreshCw } from 'lucide-react'
 import { api } from '../../api'
 import type { Article, Category } from '../../types'
 import { Button } from '../../components/ui/button'
@@ -26,14 +26,18 @@ export function ArticleManagement() {
   const [draggingCategory, setDraggingCategory] = useState<Category | null>(null)
   const [moveTargetCategory, setMoveTargetCategory] = useState<Category | null>(null)
   const [moveConfirmOpen, setMoveConfirmOpen] = useState(false)
+  const [deleteCategoryConfirm, setDeleteCategoryConfirm] = useState<Category | null>(null)
   const [coverEditingCategory, setCoverEditingCategory] = useState<Category | null>(null)
   const [coverMode, setCoverMode] = useState<'icon' | 'image'>('image')
   const [coverIconName, setCoverIconName] = useState('Folder')
   const [coverImageFile, setCoverImageFile] = useState<File | null>(null)
   const [coverImagePreview, setCoverImagePreview] = useState('')
+  const [syncing, setSyncing] = useState(false)
   const [importRemoteOpen, setImportRemoteOpen] = useState(false)
   const [importRemoteUrl, setImportRemoteUrl] = useState('')
   const [importRemoteTargetId, setImportRemoteTargetId] = useState<number | null>(null)
+  const [importRemoteMode, setImportRemoteMode] = useState<'category' | 'customPath'>('category')
+  const [importRemoteCustomPath, setImportRemoteCustomPath] = useState('')
   const [importRemoteLoading, setImportRemoteLoading] = useState(false)
 
   useEffect(() => {
@@ -111,8 +115,13 @@ export function ArticleManagement() {
   }
 
   const handleDeleteCategory = async (cat: Category) => {
-    if (!confirm(`确定删除分类"${cat.name}"？`)) return
-    await api.deleteCategory(cat.id)
+    setDeleteCategoryConfirm(cat)
+  }
+
+  const handleConfirmDeleteCategory = async () => {
+    if (!deleteCategoryConfirm) return
+    await api.deleteCategory(deleteCategoryConfirm.id)
+    setDeleteCategoryConfirm(null)
     api.getCategoryTree().then(setCategories).catch(() => {})
   }
 
@@ -191,19 +200,44 @@ export function ArticleManagement() {
     }
   }
 
+  const handleSync = async () => {
+    setSyncing(true)
+    try {
+      await api.syncCategories()
+      toast.success('文件同步完成')
+      api.getCategoryTree().then(setCategories).catch(() => {})
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '同步失败')
+    } finally {
+      setSyncing(false)
+    }
+  }
+
   const handleImportRemoteRepo = async () => {
     const url = importRemoteUrl.trim()
     if (!url) {
       toast.error('请输入远程仓库地址')
       return
     }
+    const isCustom = importRemoteMode === 'customPath'
+    const customPath = importRemoteCustomPath.trim()
+    if (isCustom && !customPath) {
+      toast.error('请输入存放路径')
+      return
+    }
     setImportRemoteLoading(true)
     try {
-      await api.cloneRemoteRepo(url, importRemoteTargetId)
+      await api.cloneRemoteRepo(
+        url,
+        isCustom ? null : importRemoteTargetId,
+        isCustom ? customPath : undefined,
+      )
       toast.success('仓库导入成功')
       setImportRemoteOpen(false)
       setImportRemoteUrl('')
       setImportRemoteTargetId(null)
+      setImportRemoteCustomPath('')
+      setImportRemoteMode('category')
       api.getCategoryTree().then(setCategories).catch(() => {})
     } catch (err) {
       toast.error(err instanceof Error ? err.message : '导入失败')
@@ -230,6 +264,11 @@ export function ArticleManagement() {
     <div className="flex h-full">
       {/* 分类树 */}
       <div className="w-64 border-r border-zinc-200 dark:border-zinc-800 overflow-y-auto p-3">
+        <div className="mb-3 flex justify-start">
+          <Button size="sm" variant="outline" onClick={handleSync} disabled={syncing}>
+            <RefreshCw size={14} className={`mr-1 ${syncing ? 'animate-spin' : ''}`} />{syncing ? '同步中' : '同步文章'}
+          </Button>
+        </div>
         <div className="mb-3 flex items-center justify-between gap-2">
           <span className="text-sm font-medium">分类</span>
           <div className="flex items-center gap-1">
@@ -285,13 +324,15 @@ export function ArticleManagement() {
           if (!open) {
             setImportRemoteUrl('')
             setImportRemoteTargetId(null)
+            setImportRemoteCustomPath('')
+            setImportRemoteMode('category')
           }
         }}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>从远程仓库获取</DialogTitle>
               <DialogDescription>
-                输入远程仓库地址，选择要添加到的服务器管理分类。不选时会添加到根目录。
+                输入远程仓库地址，选择存放位置。
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
@@ -300,13 +341,46 @@ export function ArticleManagement() {
                 onChange={e => setImportRemoteUrl(e.target.value)}
                 placeholder="https://github.com/owner/repo.git"
               />
-              <div className="max-h-64 overflow-y-auto rounded-md border border-zinc-200 p-3 dark:border-zinc-800">
-                <ServerManagedCategorySelector
-                  categories={categories}
-                  selectedId={importRemoteTargetId}
-                  onSelect={setImportRemoteTargetId}
-                />
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">存放位置</label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="radio"
+                      checked={importRemoteMode === 'category'}
+                      onChange={() => setImportRemoteMode('category')}
+                      className="accent-zinc-700 dark:accent-zinc-300"
+                    />
+                    选择已有分类
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="radio"
+                      checked={importRemoteMode === 'customPath'}
+                      onChange={() => setImportRemoteMode('customPath')}
+                      className="accent-zinc-700 dark:accent-zinc-300"
+                    />
+                    手动输入路径
+                  </label>
+                </div>
               </div>
+
+              {importRemoteMode === 'category' ? (
+                <div className="max-h-64 overflow-y-auto rounded-md border border-zinc-200 p-3 dark:border-zinc-800">
+                  <ServerManagedCategorySelector
+                    categories={categories}
+                    selectedId={importRemoteTargetId}
+                    onSelect={setImportRemoteTargetId}
+                  />
+                </div>
+              ) : (
+                <Input
+                  value={importRemoteCustomPath}
+                  onChange={e => setImportRemoteCustomPath(e.target.value)}
+                  placeholder="例如: new-folder/my-repo"
+                />
+              )}
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setImportRemoteOpen(false)}>
@@ -315,6 +389,28 @@ export function ArticleManagement() {
               <Button onClick={handleImportRemoteRepo} disabled={importRemoteLoading}>
                 {importRemoteLoading ? '导入中...' : '确定'}
               </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        <Dialog open={!!deleteCategoryConfirm} onOpenChange={open => {
+          if (!open) setDeleteCategoryConfirm(null)
+        }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>确认删除分类</DialogTitle>
+              <DialogDescription>
+                确定要删除分类 <span className="font-medium text-foreground">{deleteCategoryConfirm?.name}</span>？
+              </DialogDescription>
+            </DialogHeader>
+            <div className="rounded-md border border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950 px-4 py-3 text-sm text-red-800 dark:text-red-200">
+              <span className="font-medium">⚠ 警告：</span>
+              删除此分类将<strong>同时删除该分类下的所有文章</strong>，此操作不可恢复！
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDeleteCategoryConfirm(null)}>
+                取消
+              </Button>
+              <Button variant="destructive" onClick={handleConfirmDeleteCategory}>确认删除</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

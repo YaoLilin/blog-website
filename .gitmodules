@@ -1,0 +1,3 @@
+[submodule "server/docs/泛微开发"]
+	path = server/docs/泛微开发
+	url = https://github.com/YaoLilin/weaver-dev-knowledge.git

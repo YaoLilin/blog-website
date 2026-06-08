@@ -6,10 +6,12 @@ import { cn, formatDate } from '../lib/utils'
 import { formatCategoryPath } from '../lib/category'
 import { useAuthStore } from '../stores/authStore'
 import { useTheme } from '../theme-provider'
+import { isTokenExpired } from '../lib/jwt'
 import type { Article, Category } from '../types'
 import { Button } from './ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog'
 import { Input } from './ui/input'
+import { SITE_CONFIG } from '../config/site'
 
 
 interface CategoryMenuProps {
@@ -48,7 +50,6 @@ export function Navbar() {
   const navigate = useNavigate()
 
   const [categories, setCategories] = useState<Category[]>([])
-  const [blogName, setBlogName] = useState(() => localStorage.getItem('blogName') || '')
   const [showArticleMenu, setShowArticleMenu] = useState(false)
   const [searchValue, setSearchValue] = useState('')
   const [showSearchDialog, setShowSearchDialog] = useState(false)
@@ -63,11 +64,6 @@ export function Navbar() {
 
   useEffect(() => {
     api.getCategoryTree().then(setCategories).catch(() => {})
-    api.getSettings().then(s => {
-      const name = s.BLOG_NAME?.trim() || ''
-      setBlogName(name)
-      if (name) localStorage.setItem('blogName', name)
-    }).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -232,7 +228,7 @@ export function Navbar() {
       <div className="container mx-auto px-4 h-14 flex items-center justify-between gap-4">
         {/* Logo */}
         <Link to="/" className="font-bold text-lg shrink-0 hover:opacity-80 transition-opacity">
-          {blogName}
+          {SITE_CONFIG.siteId}
         </Link>
 
         {/* 导航按钮 */}
@@ -349,7 +345,7 @@ export function Navbar() {
           </a>
 
           {/* 后台按钮 */}
-          {isAdmin && (
+          {isAdmin && !isTokenExpired() && (
             <Link to="/admin">
               <Button variant="ghost" size="icon" className="h-8 w-8" title="后台管理">
                 <Settings size={16} />

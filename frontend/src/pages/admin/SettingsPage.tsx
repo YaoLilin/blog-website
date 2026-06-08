@@ -8,7 +8,6 @@ import { toast } from 'sonner'
 import { formatCategoryPath } from '../../lib/category'
 
 export function SettingsPage() {
-  const [blogName, setBlogName] = useState('')
   const [motto, setMotto] = useState('')
   const [storageLocation, setStorageLocation] = useState('CURRENT_FOLDER')
   const [customPath, setCustomPath] = useState('')
@@ -24,7 +23,6 @@ export function SettingsPage() {
 
   useEffect(() => {
     api.getSettings().then(async s => {
-      setBlogName(s.BLOG_NAME || '')
       if (s.MOTTO) setMotto(s.MOTTO)
       if (s.ATTACHMENT_STORAGE_LOCATION) setStorageLocation(s.ATTACHMENT_STORAGE_LOCATION)
       if (s.ATTACHMENT_CUSTOM_PATH) setCustomPath(s.ATTACHMENT_CUSTOM_PATH)
@@ -94,7 +92,6 @@ export function SettingsPage() {
     setSaving(true)
     try {
       await Promise.all([
-        api.updateSetting('BLOG_NAME', blogName.trim()),
         api.updateMotto(motto),
         api.updateSetting('ATTACHMENT_STORAGE_LOCATION', storageLocation),
         storageLocation === 'SUBFOLDER' || storageLocation === 'CUSTOM_PATH'
@@ -117,17 +114,6 @@ export function SettingsPage() {
       <h1 className="text-xl font-semibold mb-6">系统设置</h1>
 
       <div className="space-y-6">
-        {/* 博客名称 */}
-        <div>
-          <label className="block text-sm font-medium mb-2">博客名称</label>
-          <Input
-            value={blogName}
-            onChange={e => setBlogName(e.target.value)}
-            placeholder="博客"
-          />
-          <p className="text-xs text-zinc-400 mt-1">显示在导航栏左侧。留空时默认显示“博客”。</p>
-        </div>
-
         {/* 座右铭 */}
         <div>
           <label className="block text-sm font-medium mb-2">首页座右铭</label>
@@ -140,7 +126,7 @@ export function SettingsPage() {
           <label className="block text-sm font-medium mb-2">首页推荐分类</label>
           <p className="text-xs text-zinc-400 mb-3">可选择任意层级分类。首页没设置时，默认取前 5 个根分类。</p>
           {allCategories.length > 0 ? (
-            <div className="rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
+            <div className="rounded-2xl border border-zinc-200 p-3 dark:border-zinc-800">
               <CategoryTreeSelector
                 categories={allCategories}
                 selectedIds={recommendedCategoryIds}
@@ -180,7 +166,7 @@ export function SettingsPage() {
           </div>
 
           <div className="grid gap-3 md:grid-cols-2">
-            <div className="rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
+            <div className="rounded-2xl border border-zinc-200 p-3 dark:border-zinc-800">
               <div className="mb-2 text-sm font-medium">已选文章（{recommendedArticleIds.length}/30）</div>
               <div className="space-y-2">
                 {recommendedArticles.map(article => (
@@ -204,7 +190,7 @@ export function SettingsPage() {
               </div>
             </div>
 
-            <div className="rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
+            <div className="rounded-2xl border border-zinc-200 p-3 dark:border-zinc-800">
               <div className="mb-2 text-sm font-medium">搜索结果</div>
               <div className="space-y-2">
                 {articleSearchResults.map(article => {

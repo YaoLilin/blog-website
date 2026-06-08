@@ -2,6 +2,7 @@ package com.blog.myblog.controller;
 
 import com.blog.myblog.dto.CategoryDto;
 import com.blog.myblog.service.CategoryService;
+import com.blog.myblog.service.FileWatcherService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -15,6 +16,7 @@ import java.util.Map;
 public class CategoryController {
 
     private final CategoryService categoryService;
+    private final FileWatcherService fileWatcherService;
 
     @GetMapping
     public List<CategoryDto> getAll() {
@@ -56,6 +58,12 @@ public class CategoryController {
     public ResponseEntity<Void> move(@PathVariable Long id, @RequestBody Map<String, Object> body) {
         Long newParentId = body.get("newParentId") != null ? Long.valueOf(body.get("newParentId").toString()) : null;
         categoryService.move(id, newParentId);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/sync")
+    public ResponseEntity<Void> sync() {
+        fileWatcherService.fullSync();
         return ResponseEntity.ok().build();
     }
 }

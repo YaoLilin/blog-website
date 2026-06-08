@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 
@@ -147,6 +148,8 @@ public class CategoryService {
 
     @Transactional
     public void delete(Long id) {
+        List<Article> articles = articleRepository.findByCategoryId(id);
+        articleRepository.deleteAll(articles);
         categoryRepository.deleteById(id);
     }
 
@@ -296,6 +299,10 @@ public class CategoryService {
         if (relativePath == null || relativePath.isBlank()) {
             return false;
         }
-        return Files.exists(Path.of(docsPath).resolve(relativePath).resolve(".git"));
+        try {
+            return Files.exists(Path.of(docsPath).resolve(relativePath).resolve(".git"));
+        } catch (InvalidPathException e) {
+            return false;
+        }
     }
 }

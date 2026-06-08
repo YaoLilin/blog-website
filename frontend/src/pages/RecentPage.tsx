@@ -1,22 +1,35 @@
 import { Calendar } from 'lucide-react'
-import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLoaderData } from 'react-router-dom'
+import { Helmet } from 'react-helmet-async'
 import { api } from '../api'
 import type { Article, Category } from '../types'
 import { formatDate } from '../lib/utils'
 import { formatCategoryPath } from '../lib/category'
+import { SITE_CONFIG } from '../config/site'
+
+export interface RecentLoaderData {
+  articles: Article[]
+  categories: Category[]
+}
+
+export async function loader(): Promise<RecentLoaderData> {
+  const [categories, articles] = await Promise.all([
+    api.getCategoryTree().catch(() => [] as Category[]),
+    api.getRecentArticles(100).catch(() => [] as Article[]),
+  ])
+  return { categories, articles }
+}
 
 export function RecentPage() {
-  const [articles, setArticles] = useState<Article[]>([])
-  const [categories, setCategories] = useState<Category[]>([])
-
-  useEffect(() => {
-    api.getCategoryTree().then(setCategories).catch(() => {})
-    api.getRecentArticles(100).then(setArticles).catch(() => {})
-  }, [])
+  const { articles, categories } = useLoaderData() as RecentLoaderData
 
   return (
-    <div className="container mx-auto px-4 py-12 max-w-4xl">
+    <>
+      <Helmet>
+        <title>最近文章 - {SITE_CONFIG.name}</title>
+        <meta name="description" content={`最近发布的文章 - ${SITE_CONFIG.name}`} />
+      </Helmet>
+      <div className="container mx-auto px-4 py-12 max-w-4xl">
       <div className="mb-8 flex items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">最近文章</h1>
@@ -34,7 +47,7 @@ export function RecentPage() {
           <Link
             key={article.id}
             to={`/articles/${article.id}`}
-            className="flex items-start justify-between p-4 rounded-lg border border-zinc-100 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-600 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-all group"
+            className="flex items-start justify-between p-4 rounded-2xl border border-zinc-100 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-600 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-all group"
           >
             <div className="flex-1 min-w-0">
               <h3 className="text-sm font-medium text-zinc-900 dark:text-zinc-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 truncate">
@@ -56,5 +69,6 @@ export function RecentPage() {
         )}
       </div>
     </div>
+    </>
   )
 }

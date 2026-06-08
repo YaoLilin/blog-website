@@ -95,7 +95,7 @@ export function ProjectPage() {
       ) : (
         <div className="space-y-4">
           {projects.map((p, i) => (
-            <div key={p.id} className="flex items-start gap-4 rounded-xl border border-zinc-200 dark:border-zinc-800 p-4">
+            <div key={p.id} className="flex items-start gap-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-4">
               <div className="w-16 h-16 shrink-0 rounded-lg overflow-hidden bg-zinc-100 dark:bg-zinc-900 flex items-center justify-center">
                 {p.coverImage ? (
                   <img src={p.coverImage} alt={p.name} className="w-full h-full object-cover" />

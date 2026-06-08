@@ -147,6 +147,26 @@ public class GitService {
         }
     }
 
+    /**
+     * 校验用户输入的自定义路径，拒绝绝对路径和路径穿越。
+     * @return 标准化后的相对路径
+     */
+    public String validateCustomPath(String customPath) {
+        if (customPath == null || customPath.isBlank()) {
+            return null;
+        }
+        String normalized = customPath.replace("\\", "/").trim();
+        if (normalized.startsWith("/")) {
+            throw new IllegalArgumentException("自定义路径不能为绝对路径");
+        }
+        Path docsRoot = Path.of(docsPath).toAbsolutePath().normalize();
+        Path resolved = docsRoot.resolve(normalized).normalize();
+        if (!resolved.startsWith(docsRoot)) {
+            throw new IllegalArgumentException("自定义路径不能超出文档目录");
+        }
+        return normalized;
+    }
+
     public Map<String, Object> cloneRemoteRepo(String url, String targetRelativePath) throws IOException, GitAPIException {
         if (url == null || url.isBlank()) {
             throw new IllegalArgumentException("仓库地址不能为空");

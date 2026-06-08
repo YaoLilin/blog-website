@@ -29,9 +29,6 @@ public class Article {
     @Column(name = "view_count")
     private Integer viewCount = 0;
 
-    @Column(name = "helpful_count")
-    private Integer helpfulCount = 0;
-
     @Column(name = "is_recommended")
     private Boolean isRecommended = false;
 

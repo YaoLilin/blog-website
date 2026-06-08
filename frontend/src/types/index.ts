@@ -17,7 +17,6 @@ export interface Article {
   filePath?: string | null
   category?: Category
   viewCount: number
-  helpfulCount: number
   isRecommended: boolean
   isServerManaged: boolean
   createdAt: string
@@ -37,7 +36,6 @@ export interface ViewStats {
   dailyViews: Array<{ date: string; count: number }>
   dailyVisits: Array<{ date: string; count: number }>
   topArticles: Array<{ article: Article; viewCount: number }>
-  topHelpfulArticles: Array<{ articleId: number; title: string; helpfulCount: number; viewCount: number; ratio: number }>
 }
 
 export interface LoginResponse {
