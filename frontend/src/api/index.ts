@@ -1,3 +1,5 @@
+import { toast } from 'sonner'
+
 const BASE_URL = '/api'
 
 const getHeaders = () => {
@@ -8,6 +10,14 @@ const getHeaders = () => {
   }
 }
 
+function handleAuthExpired() {
+  localStorage.removeItem('auth_token')
+  // 清除 Zustand 持久化数据
+  try { localStorage.removeItem('auth-store') } catch {}
+  toast.error('登录已过期，请重新登录')
+  window.location.href = '/admin/login'
+}
+
 async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const resp = await fetch(`${BASE_URL}${endpoint}`, {
     ...options,
@@ -15,6 +25,10 @@ async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
   })
   const text = await resp.text()
   if (!resp.ok) {
+    if (resp.status === 401) {
+      handleAuthExpired()
+      throw new Error('登录已过期')
+    }
     let message = text || `HTTP ${resp.status}`
     try {
       const parsed = JSON.parse(text)
@@ -73,10 +87,6 @@ export const api = {
     request<void>(`/articles/${id}`, { method: 'DELETE' }),
   recordView: (id: number) =>
     request<void>(`/articles/${id}/view`, { method: 'POST' }),
-  recordHelpful: (id: number, fingerprint: string) =>
-    request<{ voted: boolean }>(`/articles/${id}/helpful`, { method: 'POST', body: JSON.stringify({ fingerprint }) }),
-  getHelpfulStatus: (id: number, fingerprint: string) =>
-    request<{ voted: boolean }>(`/articles/${id}/helpful/status?fingerprint=${encodeURIComponent(fingerprint)}`),
   getArticleGitRemote: (id: number) =>
     request<{ url: string }>(`/articles/${id}/git-remote`),
 
@@ -111,6 +121,10 @@ export const api = {
     }).then(async r => {
       const text = await r.text()
       if (!r.ok) {
+        if (r.status === 401) {
+          handleAuthExpired()
+          throw new Error('登录已过期')
+        }
         throw new Error(text || `HTTP ${r.status}`)
       }
       return (text ? JSON.parse(text) : undefined) as { url: string; originalName: string }
@@ -128,10 +142,14 @@ export const api = {
     request<void>('/git/push', { method: 'POST', body: JSON.stringify({ remoteName, username, password, categoryId }) }),
   gitPull: (remoteName: string, username: string, password: string, categoryId?: number | null) =>
     request<{ success: boolean; hasConflicts?: boolean }>('/git/pull', { method: 'POST', body: JSON.stringify({ remoteName, username, password, categoryId }) }),
-  cloneRemoteRepo: (url: string, targetCategoryId: number | null) =>
+  cloneRemoteRepo: (url: string, targetCategoryId: number | null, customPath?: string) =>
     request<{ directory: string; repoName: string; relativePath: string }>('/git/clone', {
       method: 'POST',
-      body: JSON.stringify({ url, targetCategoryId }),
+      body: JSON.stringify({
+        url,
+        targetCategoryId,
+        ...(customPath ? { customPath } : {}),
+      }),
     }),
   addRemote: (name: string, url: string, categoryId?: number | null) =>
     request<void>('/git/remote/add', { method: 'POST', body: JSON.stringify({ name, url, categoryId }) }),
@@ -139,6 +157,8 @@ export const api = {
     const q = categoryId == null ? '' : `?categoryId=${categoryId}`
     return request<void>(`/git/remote/${name}${q}`, { method: 'DELETE' })
   },
+  syncCategories: () => request<void>('/categories/sync', { method: 'POST' }),
+
   listRemotes: (categoryId?: number | null) => {
     const q = categoryId == null ? '' : `?categoryId=${categoryId}`
     return request<Array<{ name: string; urls: string[] }>>(`/git/remotes${q}`)

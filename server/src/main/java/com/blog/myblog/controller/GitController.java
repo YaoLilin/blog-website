@@ -100,8 +100,17 @@ public class GitController {
     public ResponseEntity<Map<String, Object>> cloneRepo(@RequestBody Map<String, Object> body) {
         try {
             String url = body.getOrDefault("url", "").toString();
-            Long targetCategoryId = parseCategoryId(body.get("targetCategoryId"));
-            Map<String, Object> result = gitService.cloneRemoteRepo(url, resolveRepoRelativePath(targetCategoryId));
+            String customPath = body.get("customPath") != null ? body.get("customPath").toString().trim() : null;
+
+            String targetRelativePath;
+            if (customPath != null && !customPath.isBlank()) {
+                targetRelativePath = gitService.validateCustomPath(customPath);
+            } else {
+                Long targetCategoryId = parseCategoryId(body.get("targetCategoryId"));
+                targetRelativePath = resolveRepoRelativePath(targetCategoryId);
+            }
+
+            Map<String, Object> result = gitService.cloneRemoteRepo(url, targetRelativePath);
             return ResponseEntity.ok(result);
         } catch (Exception e) {
             Map<String, Object> error = new java.util.HashMap<>();

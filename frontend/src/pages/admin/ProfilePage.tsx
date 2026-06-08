@@ -65,10 +65,10 @@ export function ProfilePage() {
                 <img
                   src={image}
                   alt="个人图片"
-                  className="w-36 h-36 rounded-xl object-cover border border-zinc-200 dark:border-zinc-700"
+                  className="w-36 h-36 rounded-2xl object-cover border border-zinc-200 dark:border-zinc-700"
                 />
               ) : (
-                <div className="w-36 h-36 rounded-xl border-2 border-dashed border-zinc-300 dark:border-zinc-600 flex items-center justify-center text-zinc-400 text-sm">
+                <div className="w-36 h-36 rounded-2xl border-2 border-dashed border-zinc-300 dark:border-zinc-600 flex items-center justify-center text-zinc-400 text-sm">
                   无图片
                 </div>
               )}

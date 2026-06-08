@@ -26,6 +26,44 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+
+  /* 对话框动画 */
+  --animate-dialog-overlay-show: dialog-overlay-show 200ms ease-out;
+  --animate-dialog-overlay-hide: dialog-overlay-hide 150ms ease-in;
+  --animate-dialog-content-show: dialog-content-show 250ms ease-out;
+  --animate-dialog-content-hide: dialog-content-hide 150ms ease-in;
+}
+
+@keyframes dialog-overlay-show {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes dialog-overlay-hide {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes dialog-content-show {
+  from {
+    opacity: 0;
+    scale: 0.95;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+
+@keyframes dialog-content-hide {
+  from {
+    opacity: 1;
+    scale: 1;
+  }
+  to {
+    opacity: 0;
+    scale: 0.95;
+  }
 }
 
 :root {

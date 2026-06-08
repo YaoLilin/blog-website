@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams, useNavigate } from 'react-router-dom'
+import { Link, useParams, useNavigate, useLoaderData } from 'react-router-dom'
+import { Helmet } from 'react-helmet-async'
 import { Folder, FolderOpen, ChevronRight, FileText, Grid, List, Calendar } from 'lucide-react'
 import { api } from '../api'
 import type { Article, Category } from '../types'
@@ -7,73 +8,95 @@ import { Button } from '../components/ui/button'
 import { formatDate } from '../lib/utils'
 import { formatCategoryPath } from '../lib/category'
 import { CategoryCover } from '../components/CategoryCover'
+import { SITE_CONFIG } from '../config/site'
+
+export interface CategoryLoaderData {
+  allCategories: Category[]
+  currentCategory: Category | null
+  breadcrumb: Category[]
+  subCategories: Category[]
+  articles: Article[]
+  recentArticles: Article[]
+}
+
+export async function loader({ params }: { params: { id?: string } }): Promise<CategoryLoaderData> {
+  const catId = params.id ? Number(params.id) : null
+
+  const [allCategories, recentArticles] = await Promise.all([
+    api.getCategoryTree().catch(() => [] as Category[]),
+    api.getRecentArticles(10).catch(() => [] as Article[]),
+  ])
+
+  if (!catId) {
+    return {
+      allCategories,
+      currentCategory: null,
+      breadcrumb: [],
+      subCategories: allCategories,
+      articles: [],
+      recentArticles,
+    }
+  }
+
+  const findCatAndPath = (cats: Category[], targetId: number, path: Category[] = []): [Category | null, Category[]] => {
+    for (const cat of cats) {
+      if (cat.id === targetId) return [cat, [...path, cat]]
+      if (cat.children) {
+        const [found, p] = findCatAndPath(cat.children, targetId, [...path, cat])
+        if (found) return [found, p]
+      }
+    }
+    return [null, []]
+  }
+
+  const [cat, path] = findCatAndPath(allCategories, catId)
+  const r = await api.getArticles({ categoryId: catId }).catch(() => ({ content: [] as Article[] }))
+
+  return {
+    allCategories,
+    currentCategory: cat,
+    breadcrumb: path,
+    subCategories: cat?.children || [],
+    articles: r.content,
+    recentArticles,
+  }
+}
 
 export function CategoryPage() {
+  const initial = useLoaderData() as CategoryLoaderData
   const { id } = useParams<{ id?: string }>()
   const navigate = useNavigate()
+
   const [viewMode, setViewMode] = useState<'icon' | 'tree'>(() => {
     return (localStorage.getItem('categoryViewMode') as 'icon' | 'tree') || 'icon'
   })
-  const [allCategories, setAllCategories] = useState<Category[]>([])
-  const [currentCategory, setCurrentCategory] = useState<Category | null>(null)
-  const [breadcrumb, setBreadcrumb] = useState<Category[]>([])
-  const [subCategories, setSubCategories] = useState<Category[]>([])
-  const [articles, setArticles] = useState<Article[]>([])
-  const [recentArticles, setRecentArticles] = useState<Article[]>([])
-  const [loading, setLoading] = useState(true)
+
+  const [allCategories, setAllCategories] = useState<Category[]>(initial.allCategories)
+  const [currentCategory, setCurrentCategory] = useState<Category | null>(initial.currentCategory)
+  const [breadcrumb, setBreadcrumb] = useState<Category[]>(initial.breadcrumb)
+  const [subCategories, setSubCategories] = useState<Category[]>(initial.subCategories)
+  const [articles, setArticles] = useState<Article[]>(initial.articles)
+  const [recentArticles] = useState<Article[]>(initial.recentArticles)
 
   useEffect(() => {
-    api.getCategoryTree().then(tree => {
-      setAllCategories(tree)
-      if (!id) {
-        setSubCategories(tree)
-        setBreadcrumb([])
-        setLoading(false)
-      }
-    }).catch(() => setLoading(false))
-    api.getRecentArticles(10).then(setRecentArticles).catch(() => {})
-  }, [])
+    setAllCategories(initial.allCategories)
+    setCurrentCategory(initial.currentCategory)
+    setBreadcrumb(initial.breadcrumb)
+    setSubCategories(initial.subCategories)
+    setArticles(initial.articles)
+  }, [id, initial])
 
   useEffect(() => {
     localStorage.setItem('categoryViewMode', viewMode)
   }, [viewMode])
 
-  useEffect(() => {
-    if (!id) {
-      setCurrentCategory(null)
-      setBreadcrumb([])
-      setSubCategories(allCategories)
-      setArticles([])
-      setLoading(false)
-      return
-    }
-    setLoading(true)
-    const catId = Number(id)
-
-    const findCatAndPath = (cats: Category[], path: Category[] = []): [Category | null, Category[]] => {
-      for (const cat of cats) {
-        if (cat.id === catId) return [cat, [...path, cat]]
-        if (cat.children) {
-          const [found, p] = findCatAndPath(cat.children, [...path, cat])
-          if (found) return [found, p]
-        }
-      }
-      return [null, []]
-    }
-
-    const [cat, path] = findCatAndPath(allCategories)
-    setCurrentCategory(cat)
-    setBreadcrumb(path)
-    setSubCategories(cat?.children || [])
-
-    api.getArticles({ categoryId: catId }).then(r => setArticles(r.content || [])).catch(() => {})
-    setLoading(false)
-  }, [id, allCategories])
-
-  if (loading) return <div className="container mx-auto px-4 py-8 text-center">加载中...</div>
-
   return (
-    <div className="container mx-auto px-4 py-8 max-w-5xl">
+    <>
+      <Helmet>
+        <title>{currentCategory ? `${currentCategory.name} - 文章分类` : '文章分类'} - {SITE_CONFIG.name}</title>
+        <meta name="description" content={`${currentCategory ? currentCategory.name : '全部'}文章分类 - ${SITE_CONFIG.name}`} />
+      </Helmet>
+      <div className="container mx-auto px-4 py-8 max-w-5xl">
       <h1 className="text-xl font-semibold mb-6 text-zinc-900 dark:text-zinc-100">文章分类</h1>
       {/* 切换按钮 */}
       <div className="flex items-center justify-between mb-6">
@@ -108,7 +131,7 @@ export function CategoryPage() {
               <Link
                 key={article.id}
                 to={`/articles/${article.id}`}
-                className="flex items-start justify-between p-4 rounded-lg border border-zinc-100 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-600 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-all group"
+                className="flex items-start justify-between p-4 rounded-2xl border border-zinc-100 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-600 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-all group"
               >
                 <div className="flex-1 min-w-0">
                   <h3 className="text-sm font-medium text-zinc-900 dark:text-zinc-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 truncate">
@@ -137,6 +160,7 @@ export function CategoryPage() {
         </section>
       )}
     </div>
+    </>
   )
 }
 
@@ -201,7 +225,7 @@ function IconView({ breadcrumb, subCategories, articles, currentCategory, onNavi
               <Link
                 key={a.id}
                 to={`/articles/${a.id}`}
-                className="flex items-center justify-between p-3 rounded-lg border border-zinc-100 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-600 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-all"
+                className="flex items-center justify-between p-3 rounded-2xl border border-zinc-100 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-600 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-all"
               >
                 <span className="text-sm flex items-center gap-2"><FileText size={14} className="text-zinc-400" />{a.title}</span>
                 <span className="text-xs text-zinc-400">{formatDate(a.createdAt)}</span>
@@ -287,7 +311,7 @@ function TreeNode({ category, depth = 0 }: { category: Category; depth?: number 
 
 function TreeView({ categories }: { categories: Category[] }) {
   return (
-    <div className="border border-zinc-200 dark:border-zinc-700 rounded-lg p-2">
+    <div className="border border-zinc-200 dark:border-zinc-700 rounded-2xl p-2">
       {categories.map(cat => <TreeNode key={cat.id} category={cat} />)}
       {categories.length === 0 && <div className="text-center py-8 text-zinc-400">暂无分类</div>}
     </div>

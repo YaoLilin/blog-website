@@ -13,7 +13,6 @@ public class ArticleDto {
     private String filePath;
     private CategoryDto category;
     private Integer viewCount;
-    private Integer helpfulCount;
     private Boolean isRecommended;
     private Boolean isServerManaged;
     private LocalDateTime createdAt;

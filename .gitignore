@@ -34,8 +34,13 @@ frontend/*.local
 .cursor
 .idea
 .vscode
+.claude
 
-docs
 server/server/static
 server/static
 server/target
+
+# 敏感信息
+docs/server-config.md
+deploy.exp
+check-server.exp

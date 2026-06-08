@@ -17,6 +17,7 @@ import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -110,6 +111,22 @@ public class FileWatcherService {
             }
         } else if (kind == StandardWatchEventKinds.ENTRY_DELETE) {
             log.info("文件已删除: {}", path);
+            String absolutePath = file.getAbsolutePath();
+            if (file.getName().endsWith(".md")) {
+                articleRepository.findByFilePath(absolutePath).ifPresent(article -> {
+                    articleRepository.delete(article);
+                    log.info("已同步删除文章: {}", article.getTitle());
+                });
+            } else {
+                List<Article> orphaned = articleRepository.findByFilePathStartingWith(absolutePath + "/");
+                if (!orphaned.isEmpty()) {
+                    articleRepository.deleteAll(orphaned);
+                    log.info("已同步删除目录下的 {} 篇文章", orphaned.size());
+                }
+                String relativePath = toRelativePath(file);
+                pruneEmptyServerCategories(relativePath);
+                log.info("已同步删除分类及子分类: {}", relativePath);
+            }
             File parent = file.getParentFile();
             if (parent != null) {
                 syncDirectory(parent, null);
@@ -119,6 +136,44 @@ public class FileWatcherService {
 
     public void rescan() {
         syncDirectory(new File(docsPath), null);
+    }
+
+    public void fullSync() {
+        syncDirectory(new File(docsPath), null);
+        List<Article> all = articleRepository.findAll();
+        List<Article> orphans = new java.util.ArrayList<>();
+        for (Article a : all) {
+            if (!Boolean.TRUE.equals(a.getIsServerManaged()) || a.getFilePath() == null) continue;
+            try {
+                if (!java.nio.file.Files.exists(java.nio.file.Path.of(a.getFilePath()))) {
+                    orphans.add(a);
+                }
+            } catch (Exception e) {
+                orphans.add(a);
+            }
+        }
+        if (!orphans.isEmpty()) {
+            articleRepository.deleteAll(orphans);
+            log.info("全量同步完成，清理了 {} 篇已删除文件的文章", orphans.size());
+        } else {
+            log.info("全量同步完成，无孤立文章");
+        }
+
+        List<Category> orphanCats = categoryRepository.findAll().stream()
+                .filter(c -> Boolean.TRUE.equals(c.getIsServerManaged()))
+                .filter(c -> c.getFilePath() != null)
+                .filter(c -> {
+                    File dir = new File(docsPath, c.getFilePath());
+                    return !dir.exists() || !dir.isDirectory();
+                })
+                .sorted((a, b) -> Integer.compare(
+                        b.getFilePath() == null ? 0 : b.getFilePath().length(),
+                        a.getFilePath() == null ? 0 : a.getFilePath().length()))
+                .toList();
+        if (!orphanCats.isEmpty()) {
+            categoryRepository.deleteAll(orphanCats);
+            log.info("全量同步完成，清理了 {} 个已删除目录的分类", orphanCats.size());
+        }
     }
 
     public void registerDirectoryTree(Path start) throws IOException {

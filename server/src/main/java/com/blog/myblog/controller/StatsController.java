@@ -2,9 +2,10 @@ package com.blog.myblog.controller;
 
 import com.blog.myblog.repository.ArticleRepository;
 import com.blog.myblog.service.ArticleService;
-import com.blog.myblog.service.HelpfulVoteService;
 import com.blog.myblog.service.SiteVisitService;
 import com.blog.myblog.service.ViewService;
+import com.blog.myblog.util.BrowserRequestDetector;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
@@ -27,7 +28,6 @@ public class StatsController {
     private final SiteVisitService siteVisitService;
     private final ArticleRepository articleRepository;
     private final ArticleService articleService;
-    private final HelpfulVoteService helpfulVoteService;
 
     @GetMapping
     public Map<String, Object> getStats() {
@@ -65,15 +65,16 @@ public class StatsController {
         });
         result.put("topArticles", topList);
 
-        result.put("topHelpfulArticles", helpfulVoteService.getTopHelpful(10));
-
         return result;
     }
 
     @PostMapping("/visit")
-    public ResponseEntity<Void> recordVisit() {
+    public ResponseEntity<Void> recordVisit(HttpServletRequest request) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth != null && auth.isAuthenticated() && !(auth instanceof AnonymousAuthenticationToken)) {
+            return ResponseEntity.ok().build();
+        }
+        if (!BrowserRequestDetector.isBrowserUserAgent(request.getHeader("User-Agent"))) {
             return ResponseEntity.ok().build();
         }
         siteVisitService.recordVisit();

@@ -4,7 +4,6 @@ import com.blog.myblog.entity.ViewRecord;
 import com.blog.myblog.repository.ArticleRepository;
 import com.blog.myblog.repository.ViewRecordRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -12,6 +11,7 @@ import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -22,18 +22,16 @@ public class ViewService {
 
     @Transactional
     public void recordView(Long articleId) {
-        try {
+        articleRepository.findById(articleId).ifPresent(a -> {
             ViewRecord viewRecord = new ViewRecord();
             viewRecord.setArticleId(articleId);
-            viewRecord.setFingerprint("auto");
+            viewRecord.setFingerprint(UUID.randomUUID().toString());
             viewRecordRepository.save(viewRecord);
 
-            articleRepository.findById(articleId).ifPresent(a -> {
-                a.setViewCount(a.getViewCount() + 1);
-                articleRepository.save(a);
-            });
-        } catch (DataIntegrityViolationException ignored) {
-        }
+            int currentViewCount = a.getViewCount() == null ? 0 : a.getViewCount();
+            a.setViewCount(currentViewCount + 1);
+            articleRepository.save(a);
+        });
     }
 
     public long getTotalViews() {

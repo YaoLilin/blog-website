@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
-import { ThumbsUp } from 'lucide-react'
 import { api } from '../../api'
 import type { ViewStats } from '../../types'
 
@@ -16,11 +15,11 @@ export function StatsPage() {
       <h1 className="text-xl font-semibold mb-6">统计数据</h1>
 
       <div className="flex gap-4 mb-8 flex-wrap">
-        <div className="p-6 rounded-xl border border-zinc-200 dark:border-zinc-700 inline-block">
+        <div className="p-6 rounded-2xl border border-zinc-200 dark:border-zinc-700 inline-block">
           <p className="text-sm text-zinc-500 mb-1">总阅读数</p>
           <p className="text-4xl font-bold">{stats?.totalViews ?? '--'}</p>
         </div>
-        <div className="p-6 rounded-xl border border-zinc-200 dark:border-zinc-700 inline-block">
+        <div className="p-6 rounded-2xl border border-zinc-200 dark:border-zinc-700 inline-block">
           <p className="text-sm text-zinc-500 mb-1">网站访问次数</p>
           <p className="text-4xl font-bold">{stats?.totalVisits ?? '--'}</p>
         </div>
@@ -78,22 +77,7 @@ export function StatsPage() {
         </div>
       )}
 
-      {/* 最有帮助排行 */}
-      {stats?.topHelpfulArticles && stats.topHelpfulArticles.length > 0 && (
-        <div>
-          <h2 className="text-base font-medium mb-4">最有帮助文章排行 Top 10</h2>
-          <div className="space-y-2">
-            {stats.topHelpfulArticles.map((item, idx) => (
-              <div key={item.articleId} className="flex items-center gap-3 p-3 rounded-lg border border-zinc-100 dark:border-zinc-800">
-                <span className={`text-sm font-bold w-6 shrink-0 ${idx < 3 ? 'text-amber-500' : 'text-zinc-400'}`}>#{idx + 1}</span>
-                <span className="flex-1 text-sm truncate">{item.title}</span>
-                <span className="flex items-center gap-1 text-sm text-zinc-500 shrink-0"><ThumbsUp size={14} />{item.helpfulCount}</span>
-                <span className="text-sm font-medium text-zinc-500 shrink-0">点赞率：{item.ratio}%</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+
     </div>
   )
 }

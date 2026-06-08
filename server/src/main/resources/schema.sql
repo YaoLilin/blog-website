@@ -68,7 +68,6 @@ CREATE TABLE IF NOT EXISTS view_record (
     fingerprint VARCHAR(64) NOT NULL,
     view_date DATE NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY unique_view (article_id, fingerprint, view_date),
     FOREIGN KEY (article_id) REFERENCES article(id) ON DELETE CASCADE,
     INDEX idx_article_id (article_id),
     INDEX idx_view_date (view_date)
@@ -133,16 +132,3 @@ CREATE TABLE IF NOT EXISTS site_visit_record (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_visit_date (visit_date)
 );
-
--- 有帮助投票表
-CREATE TABLE IF NOT EXISTS helpful_vote (
-    id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    article_id BIGINT NOT NULL,
-    fingerprint VARCHAR(64) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY unique_helpful_vote (article_id, fingerprint),
-    FOREIGN KEY (article_id) REFERENCES article(id) ON DELETE CASCADE,
-    INDEX idx_article_id (article_id)
-);
-
-ALTER TABLE article ADD COLUMN IF NOT EXISTS helpful_count INT DEFAULT 0;

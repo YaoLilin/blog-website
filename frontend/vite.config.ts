@@ -2,6 +2,8 @@ import react from '@vitejs/plugin-react'
 import path from 'path'
 import { defineConfig } from 'vite'
 
+const BACKEND_URL = 'http://localhost:8081'
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
@@ -13,12 +15,22 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://localhost:8081',
+        target: BACKEND_URL,
         changeOrigin: true,
+      },
+      '/robots.txt': {
+        target: BACKEND_URL,
+        changeOrigin: true,
+        rewrite: (path) => '/api' + path,
+      },
+      '/sitemap.xml': {
+        target: BACKEND_URL,
+        changeOrigin: true,
+        rewrite: (path) => '/api' + path,
       },
       // 服务器文档目录中的图片/附件
       '/docs-static': {
-        target: 'http://localhost:8081',
+        target: BACKEND_URL,
         changeOrigin: true,
         rewrite: (path) => '/api' + path,
       },

@@ -15,7 +15,9 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
@@ -345,7 +347,12 @@ public class ArticleService {
         if (articleDir == null) return content;
 
         Path docsRoot = Path.of(docsPath).normalize();
-        Path articleDirPath = articleDir.toPath().normalize();
+        Path articleDirPath;
+        try {
+            articleDirPath = articleDir.toPath().normalize();
+        } catch (InvalidPathException e) {
+            return content;
+        }
 
         Matcher matcher = MD_LINK_PATTERN.matcher(content);
         StringBuilder sb = new StringBuilder();
@@ -368,7 +375,10 @@ public class ArticleService {
                 Path resolved = articleDirPath.resolve(normalizedHref).normalize();
                 if (resolved.startsWith(docsRoot)) {
                     String relative = docsRoot.relativize(resolved).toString().replace("\\", "/");
-                    String newHref = "/api/docs-static/" + relative;
+                    String encodedRelative = URLEncoder.encode(relative, StandardCharsets.UTF_8)
+                            .replace("+", "%20")
+                            .replace("%2F", "/");
+                    String newHref = "/api/docs-static/" + encodedRelative;
                     matcher.appendReplacement(sb, Matcher.quoteReplacement(bracket + "(" + newHref + tail + ")"));
                 } else {
                     matcher.appendReplacement(sb, Matcher.quoteReplacement(matcher.group(0)));
@@ -496,7 +506,7 @@ public class ArticleService {
                 throw new IllegalArgumentException("文件不存在");
             }
             String content = Files.readString(file.toPath(), StandardCharsets.UTF_8);
-            LocalDateTime fileCreatedAt = resolveFileCreatedAt(file.toPath());
+            LocalDateTime fileCreatedAt = resolveFileCreatedAt(filePath);
             ArticleDto dto = new ArticleDto();
             dto.setId(null);
             dto.setTitle(stripExtension(file.getName()));
@@ -538,11 +548,10 @@ public class ArticleService {
         dto.setCategoryId(article.getCategoryId());
         dto.setFilePath(article.getFilePath());
         dto.setViewCount(article.getViewCount());
-        dto.setHelpfulCount(article.getHelpfulCount());
         dto.setIsRecommended(article.getIsRecommended());
         dto.setIsServerManaged(article.getIsServerManaged());
         dto.setCreatedAt(Boolean.TRUE.equals(article.getIsServerManaged()) && article.getFilePath() != null
-                ? resolveFileCreatedAt(Path.of(article.getFilePath()))
+                ? resolveFileCreatedAt(article.getFilePath())
                 : article.getCreatedAt());
         dto.setUpdatedAt(article.getUpdatedAt());
         if (article.getCategory() != null) {
@@ -554,12 +563,13 @@ public class ArticleService {
         return dto;
     }
 
-    private LocalDateTime resolveFileCreatedAt(Path filePath) {
+    private LocalDateTime resolveFileCreatedAt(String filePath) {
         try {
-            if (!Files.exists(filePath)) {
+            Path path = Path.of(filePath);
+            if (!Files.exists(path)) {
                 return LocalDateTime.now();
             }
-            BasicFileAttributes attrs = Files.readAttributes(filePath, BasicFileAttributes.class);
+            BasicFileAttributes attrs = Files.readAttributes(path, BasicFileAttributes.class);
             FileTime fileTime = attrs.creationTime();
             if (fileTime == null || fileTime.toMillis() <= 0) {
                 fileTime = attrs.lastModifiedTime();

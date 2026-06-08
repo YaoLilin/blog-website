@@ -112,7 +112,7 @@ export function GitPage() {
     <div className="p-8 max-w-2xl">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-xl font-semibold">Git 同步</h1>
-        <Button variant="ghost" size="icon" onClick={refresh} disabled={loading}><RefreshCw size={16} className={loading ? 'animate-spin' : ''} /></Button>
+        <Button variant="ghost" size="icon" onClick={() => refresh()} disabled={loading}><RefreshCw size={16} className={loading ? 'animate-spin' : ''} /></Button>
       </div>
 
       <div className="mb-6 rounded-lg border border-zinc-200 dark:border-zinc-700 p-4">

@@ -11,6 +11,7 @@ import java.util.Optional;
 
 public interface ArticleRepository extends JpaRepository<Article, Long> {
     Page<Article> findByCategoryId(Long categoryId, Pageable pageable);
+    List<Article> findByCategoryId(Long categoryId);
     List<Article> findByIsRecommendedTrueOrderByCreatedAtDesc();
     List<Article> findTop20ByOrderByCreatedAtDesc();
 
@@ -25,4 +26,5 @@ public interface ArticleRepository extends JpaRepository<Article, Long> {
 
     List<Article> findByFilePathAndIsServerManagedTrue(String filePath);
     Optional<Article> findByFilePath(String filePath);
+    List<Article> findByFilePathStartingWith(String prefix);
 }
