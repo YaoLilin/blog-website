@@ -50,7 +50,7 @@ myblog/
 1. **Java**: JDK 17 或更高
 2. **Maven**: 3.6+
 3. **MySQL**: 8.0+
-4. **Redis**: 6.0+
+4. **Redis**: 6.0+（可选；启用阅读统计去重/缓存相关能力时使用）
 
 ### 安装步骤
 
@@ -94,13 +94,17 @@ docker run -d -p 6379:6379 redis:alpine
 编辑 `server/src/main/resources/application.properties`：
 
 ```properties
+# 服务端口和 API 前缀
+server.port=8081
+server.servlet.context-path=/api
+
 # 修改数据库连接信息
 
 spring.datasource.url=jdbc:mysql://localhost:3306/blog_db
 spring.datasource.username=your_mysql_username
 spring.datasource.password=your_mysql_password
 
-# 修改 Redis 连接信息
+# 修改 Redis 连接信息（未使用 Redis 的环境可不配置/不启动）
 
 spring.data.redis.host=localhost
 spring.data.redis.port=6379
@@ -118,6 +122,9 @@ app.admin.password=$2a$10$MqoKK/5vKGk91GKHOB.2wu0D1LT871T8Kae7jWlAybkE9NbpHKHoq
 # 修改文档路径
 
 app.docs.path=/path/to/your/docs
+app.image.storage.path=/path/to/static/images
+app.attachment.storage.path=/path/to/static/attachments
+app.frontend.dist.path=/path/to/frontend/dist
 ```
 
 #### 5. 配置 Nginx
@@ -147,7 +154,7 @@ cd server
 mvn spring-boot:run
 ```
 
-后端将在 `http://localhost:8080` 启动。
+后端将在 `http://localhost:8081/api` 启动。
 
 #### 启动前端
 
@@ -158,9 +165,9 @@ npm run dev
 
 前端将在 `http://localhost:5173` 启动。
 
-开发环境下，Vite 会把以 `/api` 开头的请求代理到后端地址，默认是 `http://localhost:8081`，因此后端需要先启动并保持运行。
+开发环境下，Vite 会把 `/api`、`/robots.txt`、`/sitemap.xml`、`/docs-static` 等请求代理到后端地址，默认是 `http://localhost:8081`，因此后端需要先启动并保持运行。
 
-如果你的后端地址不是 `http://localhost:8081`，请修改 `frontend/vite.config.ts` 里的 `server.proxy['/api'].target`，把它改成实际的后端地址即可。
+如果你的后端地址不是 `http://localhost:8081`，请修改 `frontend/vite.config.ts` 顶部的 `BACKEND_URL` 常量，把它改成实际的后端地址即可。所有开发代理都会复用这个常量。
 
 ### 访问应用
 
@@ -217,6 +224,15 @@ cd server
 
 ### 生产环境部署
 
+推荐服务器目录约定：
+
+- 项目部署根目录：`/opt/myblog`
+- 前端静态目录：`/opt/myblog/dist`
+- 后端 JAR：`/opt/myblog/app.jar`
+- 后端配置：`/opt/myblog/application.properties`
+- 后端日志：`/opt/myblog/app.log`
+- 后端 API：`http://127.0.0.1:8081/api`
+
 #### 1. 构建前端
 
 ```bash
@@ -233,10 +249,10 @@ cd server
 
 #### 3. 部署前端
 
-将 `frontend/dist` 目录部署到 Nginx：
+将 `frontend/dist` 目录部署到服务器：
 
 ```bash
-sudo cp -r frontend/dist/* /var/www/blog/frontend/
+scp -r frontend/dist/* root@<server-ip>:/opt/myblog/dist/
 ```
 
 #### 4. 部署后端
@@ -244,13 +260,19 @@ sudo cp -r frontend/dist/* /var/www/blog/frontend/
 将 `server/target/*.jar` 部署到服务器：
 
 ```bash
-sudo cp server/target/myblog-server-1.0.0.jar /var/www/blog/
+scp server/target/myblog-server-1.0.0.jar root@<server-ip>:/opt/myblog/app.jar.new
 ```
 
 #### 5. 启动后端服务
 
+登录服务器后执行：
+
 ```bash
-sudo java -jar /var/www/blog/myblog-server-1.0.0.jar
+cd /opt/myblog
+mv app.jar app.jar.old 2>/dev/null || true
+mv app.jar.new app.jar
+pkill -f 'java.*app.jar' 2>/dev/null || true
+LANG=C.UTF-8 LC_ALL=C.UTF-8 nohup java -Dfile.encoding=UTF-8 -jar app.jar --spring.config.location=/opt/myblog/application.properties > /opt/myblog/app.log 2>&1 &
 ```
 
 或使用 systemd 服务：
@@ -262,9 +284,9 @@ After=network.target
 
 [Service]
 Type=simple
-User=www-data
-WorkingDirectory=/var/www/blog
-ExecStart=/usr/bin/java -jar /var/www/blog/myblog-server-1.0.0.jar
+User=root
+WorkingDirectory=/opt/myblog
+ExecStart=/usr/bin/java -Dfile.encoding=UTF-8 -jar /opt/myblog/app.jar --spring.config.location=/opt/myblog/application.properties
 Restart=always
 RestartSec=10
 
@@ -274,7 +296,25 @@ WantedBy=multi-user.target
 
 #### 6. 配置 Nginx
 
-确保 Nginx 配置正确指向生产路径。
+确保 Nginx 配置正确指向生产路径：
+
+- 前端根目录：`root /opt/myblog/dist`
+- 后端代理：`proxy_pass http://127.0.0.1:8081`
+- 图片目录：`alias /opt/myblog/static/images/`
+- 附件目录：`alias /opt/myblog/static/attachments/`
+
+```bash
+nginx -t
+nginx -s reload
+```
+
+#### 7. 部署后检查
+
+```bash
+ps aux | grep 'java.*app.jar' | grep -v grep
+tail -f /opt/myblog/app.log
+curl -s -o /dev/null -w 'API: HTTP %{http_code}\n' http://127.0.0.1:8081/api/articles
+```
 
 ## 数据库设计
 
@@ -308,8 +348,8 @@ WantedBy=multi-user.target
    - 备份静态资源（images/ 和 attachments/）
 
 4. **日志**
-   - 检查后端日志：`logs/` 目录
-   - 检查 Nginx 日志：`/var/log/nginx/`
+   - 检查后端日志：`/opt/myblog/app.log`
+   - 检查 Nginx 日志：`/var/log/nginx/` 或服务器实际 Nginx 日志目录
 
 ## 许可证
 
