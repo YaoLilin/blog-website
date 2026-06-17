@@ -18,6 +18,7 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -195,7 +196,12 @@ public class FileWatcherService {
             Category cat = categoryRepository.findByFilePathAndIsServerManagedTrueOrderByIdAsc(relativePath)
                     .stream()
                     .findFirst()
-                    .orElseGet(() -> createServerCategory(dirName, relativePath, parentCategoryId));
+                    .orElseGet(() -> createServerCategory(dirName, relativePath, resolveParentCategoryId(relativePath, parentCategoryId)));
+            Long resolvedParentCategoryId = resolveParentCategoryId(relativePath, parentCategoryId);
+            if (!Objects.equals(cat.getParentId(), resolvedParentCategoryId)) {
+                cat.setParentId(resolvedParentCategoryId);
+                cat = categoryRepository.save(cat);
+            }
             catId = cat.getId();
         }
 
@@ -241,6 +247,22 @@ public class FileWatcherService {
         newCat.setIsServerManaged(true);
         newCat.setSortOrder(0);
         return categoryRepository.save(newCat);
+    }
+
+    private Long resolveParentCategoryId(String relativePath, Long fallbackParentCategoryId) {
+        if (fallbackParentCategoryId != null) {
+            return fallbackParentCategoryId;
+        }
+        int separatorIndex = relativePath.lastIndexOf('/');
+        if (separatorIndex <= 0) {
+            return null;
+        }
+        String parentRelativePath = relativePath.substring(0, separatorIndex);
+        return categoryRepository.findByFilePathAndIsServerManagedTrueOrderByIdAsc(parentRelativePath)
+                .stream()
+                .findFirst()
+                .map(Category::getId)
+                .orElse(null);
     }
 
     private String toRelativePath(File dir) {

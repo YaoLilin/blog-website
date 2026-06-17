@@ -2,6 +2,10 @@ import { toast } from 'sonner'
 
 const BASE_URL = '/api'
 
+type ApiRequestOptions = RequestInit & {
+  redirectOnUnauthorized?: boolean
+}
+
 const getHeaders = () => {
   const token = localStorage.getItem('auth_token')
   return {
@@ -18,14 +22,15 @@ function handleAuthExpired() {
   window.location.href = '/admin/login'
 }
 
-async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
+async function request<T>(endpoint: string, options?: ApiRequestOptions): Promise<T> {
+  const { redirectOnUnauthorized = true, ...fetchOptions } = options || {}
   const resp = await fetch(`${BASE_URL}${endpoint}`, {
-    ...options,
-    headers: { ...getHeaders(), ...(options?.headers || {}) },
+    ...fetchOptions,
+    headers: { ...getHeaders(), ...(fetchOptions.headers || {}) },
   })
   const text = await resp.text()
   if (!resp.ok) {
-    if (resp.status === 401) {
+    if (resp.status === 401 && redirectOnUnauthorized) {
       handleAuthExpired()
       throw new Error('登录已过期')
     }
@@ -47,6 +52,7 @@ export const api = {
     request<{ token: string }>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ password }),
+      redirectOnUnauthorized: false,
     }),
 
   // Categories
