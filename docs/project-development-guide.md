@@ -162,6 +162,8 @@
 | `/static/attachments/**` | `app.attachment.storage.path` |
 | `/docs-static/**` | `app.docs.path` |
 
+生产 Nginx 应直接用 `alias` 暴露 `/api/docs-static/**` 和 `/docs-static/**` 到 `app.docs.path`，避免大文件经过后端代理时触发 Nginx proxy 临时目录权限或缓冲问题。
+
 ### 3.6 后端 API 模块
 
 | 模块 | 路径 | 功能 |

@@ -228,10 +228,40 @@ cd server
 
 - 项目部署根目录：`/opt/myblog`
 - 前端静态目录：`/opt/myblog/dist`
+- 服务器文档目录：`/opt/myblog/docs`
+- 图片目录：`/opt/myblog/static/images`
+- 附件目录：`/opt/myblog/static/attachments`
 - 后端 JAR：`/opt/myblog/app.jar`
 - 后端配置：`/opt/myblog/application.properties`
 - 后端日志：`/opt/myblog/app.log`
 - 后端 API：`http://127.0.0.1:8081/api`
+
+生产配置变量：
+
+| 配置项 | 默认值 | 用途 |
+| --- | --- | --- |
+| `APP_ROOT` | `/opt/myblog` | 部署根目录 |
+| `FRONTEND_DIST` | `/opt/myblog/dist` | Nginx 前端 `root` |
+| `BACKEND_PORT` | `8081` | Spring Boot 服务端口 |
+| `BACKEND_UPSTREAM` | `http://127.0.0.1:8081` | Nginx 反向代理上游 |
+| `BACKEND_CONTEXT_PATH` | `/api` | 后端 API 前缀 |
+| `APP_JAR` | `/opt/myblog/app.jar` | 后端 JAR 路径 |
+| `APP_CONFIG` | `/opt/myblog/application.properties` | 后端配置文件 |
+| `APP_LOG` | `/opt/myblog/app.log` | 后端日志文件 |
+| `DOCS_DIR` | `/opt/myblog/docs` | 管理文档目录，映射 `/api/docs-static/**` 和 `/docs-static/**` |
+| `IMAGE_DIR` | `/opt/myblog/static/images` | 图片静态资源目录 |
+| `ATTACHMENT_DIR` | `/opt/myblog/static/attachments` | 附件静态资源目录 |
+
+对应后端 `application.properties`：
+
+```properties
+server.port=8081
+server.servlet.context-path=/api
+app.docs.path=/opt/myblog/docs
+app.image.storage.path=/opt/myblog/static/images
+app.attachment.storage.path=/opt/myblog/static/attachments
+app.frontend.dist.path=/opt/myblog/dist
+```
 
 #### 1. 构建前端
 
@@ -302,6 +332,8 @@ WantedBy=multi-user.target
 - 后端代理：`proxy_pass http://127.0.0.1:8081`
 - 图片目录：`alias /opt/myblog/static/images/`
 - 附件目录：`alias /opt/myblog/static/attachments/`
+- 文档目录：`alias /opt/myblog/docs/`
+- `/api/docs-static/` 和 `/docs-static/` 应直接用 Nginx `alias` 暴露文档目录，避免大文件经后端代理触发 Nginx proxy 临时目录权限或缓冲问题。
 
 ```bash
 nginx -t
@@ -315,6 +347,57 @@ ps aux | grep 'java.*app.jar' | grep -v grep
 tail -f /opt/myblog/app.log
 curl -s -o /dev/null -w 'API: HTTP %{http_code}\n' http://127.0.0.1:8081/api/articles
 ```
+
+### Linux 服务器一键部署脚本
+
+仓库提供通用脚本 `scripts/deploy-linux.sh`，用于在目标 Linux 服务器本机部署当前项目。脚本不包含任何服务器 IP、账号或密码；需要先把仓库代码放到目标服务器，再在服务器上执行。
+
+默认部署到 `/opt/myblog`：
+
+```bash
+./scripts/deploy-linux.sh
+```
+
+可用环境变量覆盖默认配置：
+
+```bash
+APP_ROOT=/srv/myblog \
+BACKEND_PORT=8081 \
+SERVER_NAME="example.com www.example.com" \
+SERVICE_NAME=myblog \
+NGINX_CONF=/etc/nginx/conf.d/myblog.conf \
+./scripts/deploy-linux.sh
+```
+
+常用变量：
+
+| 变量 | 默认值 | 说明 |
+| --- | --- | --- |
+| `APP_ROOT` | `/opt/myblog` | 部署根目录 |
+| `FRONTEND_DIST` | `$APP_ROOT/dist` | 前端静态文件目录 |
+| `DOCS_DIR` | `$APP_ROOT/docs` | 管理文档目录 |
+| `IMAGE_DIR` | `$APP_ROOT/static/images` | 图片目录 |
+| `ATTACHMENT_DIR` | `$APP_ROOT/static/attachments` | 附件目录 |
+| `APP_JAR` | `$APP_ROOT/app.jar` | 后端 JAR |
+| `APP_CONFIG` | `$APP_ROOT/application.properties` | 后端配置 |
+| `APP_LOG` | `$APP_ROOT/app.log` | 后端日志 |
+| `BACKEND_PORT` | `8081` | 后端端口 |
+| `BACKEND_CONTEXT_PATH` | `/api` | API 前缀 |
+| `SERVICE_NAME` | `myblog` | systemd 服务名 |
+| `SERVER_NAME` | `_` | Nginx `server_name` |
+| `NGINX_CONF` | `/etc/nginx/conf.d/myblog.conf` | Nginx 配置输出路径 |
+| `NGINX_BIN` | `nginx` | Nginx 命令，可改为 `/usr/sbin/aa_nginx` |
+| `SKIP_BUILD` | `0` | 设为 `1` 时跳过构建 |
+| `SKIP_NGINX` | `0` | 设为 `1` 时不写 Nginx 配置 |
+| `SKIP_DOCS` | `0` | 设为 `1` 时不同步 `server/docs` |
+
+脚本会执行：
+
+1. 构建前端和后端。
+2. 同步前端、文档、图片、附件到部署目录。
+3. 安装或更新 systemd 服务，并使用 `-Dfile.encoding=UTF-8` 启动后端。
+4. 生成 Nginx 配置，其中 `/api/docs-static/**` 和 `/docs-static/**` 直接 `alias` 到文档目录，适合大文件下载。
+5. 执行 `nginx -t`、reload，并验证本机 API。
 
 ## 数据库设计
 
