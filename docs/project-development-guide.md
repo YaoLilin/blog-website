@@ -481,6 +481,7 @@ Git 管理页由 `GitPage` 实现，主要功能：
 - `category.file_path` 记录服务器文档目录路径。
 - `article.file_path` 记录文章文件路径。
 - `/categories/sync` 触发 `FileWatcherService.fullSync()`，同步服务器文件和数据库。
+- 文件监听创建服务器管理分类时，会根据上级目录 `file_path` 解析父分类，保持磁盘目录和分类树层级一致。
 - `/docs-static/**` 暴露文档静态访问。
 
 ### 6.2 上传文件

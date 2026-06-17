@@ -11,8 +11,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
+import java.nio.file.FileVisitResult;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -148,9 +150,127 @@ public class CategoryService {
 
     @Transactional
     public void delete(Long id) {
-        List<Article> articles = articleRepository.findByCategoryId(id);
-        articleRepository.deleteAll(articles);
-        categoryRepository.deleteById(id);
+        Category category = categoryRepository.findById(id).orElseThrow();
+        List<Category> allCategories = categoryRepository.findAll();
+        Set<Long> categoryIdsToDelete = collectDescendantIds(id, allCategories);
+        Path serverManagedDirectory = null;
+
+        if (Boolean.TRUE.equals(category.getIsServerManaged())) {
+            serverManagedDirectory = resolveServerManagedDirectory(category);
+            collectServerManagedPathIds(category, allCategories, categoryIdsToDelete);
+        }
+
+        List<Article> articlesToDelete = articleRepository.findAll().stream()
+                .filter(article -> article.getCategoryId() != null && categoryIdsToDelete.contains(article.getCategoryId()))
+                .collect(Collectors.toCollection(ArrayList::new));
+
+        if (Boolean.TRUE.equals(category.getIsServerManaged()) && category.getFilePath() != null && !category.getFilePath().isBlank()) {
+            String absolutePrefix = Path.of(docsPath).resolve(category.getFilePath()).normalize().toString() + "/";
+            articleRepository.findByFilePathStartingWith(absolutePrefix).forEach(article -> {
+                if (!articlesToDelete.contains(article)) {
+                    articlesToDelete.add(article);
+                }
+            });
+        }
+
+        if (!articlesToDelete.isEmpty()) {
+            articleRepository.deleteAll(articlesToDelete);
+        }
+
+        List<Category> categoriesToDelete = allCategories.stream()
+                .filter(cat -> categoryIdsToDelete.contains(cat.getId()))
+                .sorted((a, b) -> Integer.compare(depth(b), depth(a)))
+                .toList();
+        if (!categoriesToDelete.isEmpty()) {
+            categoryRepository.deleteAll(categoriesToDelete);
+        }
+
+        articleRepository.flush();
+        categoryRepository.flush();
+
+        if (serverManagedDirectory != null) {
+            deleteServerManagedDirectory(serverManagedDirectory);
+        }
+    }
+
+    private Set<Long> collectDescendantIds(Long rootId, List<Category> allCategories) {
+        Set<Long> ids = new HashSet<>();
+        ids.add(rootId);
+        boolean changed;
+        do {
+            changed = false;
+            for (Category category : allCategories) {
+                if (category.getParentId() != null && ids.contains(category.getParentId()) && ids.add(category.getId())) {
+                    changed = true;
+                }
+            }
+        } while (changed);
+        return ids;
+    }
+
+    private void collectServerManagedPathIds(Category root, List<Category> allCategories, Set<Long> ids) {
+        if (root.getFilePath() == null || root.getFilePath().isBlank()) {
+            return;
+        }
+        String prefix = root.getFilePath().endsWith("/") ? root.getFilePath() : root.getFilePath() + "/";
+        for (Category category : allCategories) {
+            if (!Boolean.TRUE.equals(category.getIsServerManaged()) || category.getFilePath() == null) {
+                continue;
+            }
+            if (category.getFilePath().equals(root.getFilePath()) || category.getFilePath().startsWith(prefix)) {
+                ids.add(category.getId());
+            }
+        }
+    }
+
+    private int depth(Category category) {
+        if (category.getFilePath() != null && !category.getFilePath().isBlank()) {
+            return category.getFilePath().split("/").length;
+        }
+        return category.getParentId() == null ? 0 : 1;
+    }
+
+    private Path resolveServerManagedDirectory(Category category) {
+        if (category.getFilePath() == null || category.getFilePath().isBlank()) {
+            return null;
+        }
+
+        Path docsRoot = Path.of(docsPath).toAbsolutePath().normalize();
+        Path target = docsRoot.resolve(category.getFilePath()).normalize();
+        if (!target.startsWith(docsRoot)) {
+            throw new IllegalArgumentException("服务器管理分类目录路径非法");
+        }
+        return target;
+    }
+
+    private void deleteServerManagedDirectory(Path target) {
+        if (!Files.exists(target)) {
+            return;
+        }
+        if (!Files.isDirectory(target)) {
+            throw new IllegalArgumentException("服务器管理分类路径不是目录");
+        }
+
+        try {
+            Files.walkFileTree(target, new java.nio.file.SimpleFileVisitor<>() {
+                @Override
+                public FileVisitResult visitFile(Path file, java.nio.file.attribute.BasicFileAttributes attrs) throws IOException {
+                    Files.deleteIfExists(file);
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+                    if (exc != null) {
+                        throw exc;
+                    }
+                    Files.deleteIfExists(dir);
+                    return FileVisitResult.CONTINUE;
+                }
+            });
+        } catch (IOException e) {
+            throw new IllegalArgumentException("服务器管理分类目录删除失败", e);
+        }
     }
 
     @Transactional
