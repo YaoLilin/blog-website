@@ -7,7 +7,7 @@ DOCS_DIR="${DOCS_DIR:-$APP_ROOT/docs}"
 IMAGE_DIR="${IMAGE_DIR:-$APP_ROOT/static/images}"
 ATTACHMENT_DIR="${ATTACHMENT_DIR:-$APP_ROOT/static/attachments}"
 APP_JAR="${APP_JAR:-$APP_ROOT/app.jar}"
-APP_CONFIG="${APP_CONFIG:-$APP_ROOT/application.properties}"
+APP_CONFIG="${APP_CONFIG:-$APP_ROOT/application.yml}"
 APP_LOG="${APP_LOG:-$APP_ROOT/app.log}"
 BACKEND_PORT="${BACKEND_PORT:-8081}"
 BACKEND_CONTEXT_PATH="${BACKEND_CONTEXT_PATH:-/api}"
@@ -103,39 +103,61 @@ ensure_app_config() {
   fi
 
   write_file_as_root "$APP_CONFIG" <<EOF_CONFIG
-server.port=$BACKEND_PORT
-server.servlet.context-path=$BACKEND_CONTEXT_PATH
+server:
+  port: $BACKEND_PORT
+  servlet:
+    context-path: $BACKEND_CONTEXT_PATH
 
-spring.datasource.url=jdbc:mysql://localhost:3306/blog_db?useSSL=false&serverTimezone=UTC
-spring.datasource.username=root
-spring.datasource.password=change-me
-spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/blog_db?useSSL=false&serverTimezone=UTC
+    username: root
+    password: change-me
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 0
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
 
-spring.jpa.hibernate.ddl-auto=update
-spring.jpa.show-sql=false
-spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.MySQLDialect
-
-spring.data.redis.host=localhost
-spring.data.redis.port=6379
-spring.data.redis.database=0
-
-app.jwt.secret=change-me
-app.jwt.expiration=604800000
-app.admin.password=change-me
-
-app.site.name=博客
-app.site.author=
-app.docs.path=$DOCS_DIR
-app.image.storage.path=$IMAGE_DIR
-app.attachment.storage.path=$ATTACHMENT_DIR
-app.frontend.dist.path=$FRONTEND_DIST
-app.attachment.max.size=52428800
-spring.servlet.multipart.max-file-size=50MB
-spring.servlet.multipart.max-request-size=50MB
-
-app.attachment.storage.location=CURRENT_FOLDER
-app.attachment.subfolder.name=attachments
-app.attachment.custom.path=
+app:
+  jwt:
+    secret: change-me
+    expiration: 604800000
+  admin:
+    password: change-me
+  site:
+    name: 博客
+    author: ""
+  docs:
+    path: $DOCS_DIR
+  image:
+    storage:
+      path: $IMAGE_DIR
+  attachment:
+    storage:
+      path: $ATTACHMENT_DIR
+      location: CURRENT_FOLDER
+    subfolder:
+      name: attachments
+    custom:
+      path: ""
+    max:
+      size: 52428800
+  frontend:
+    dist:
+      path: $FRONTEND_DIST
 EOF_CONFIG
 
   echo "Created app config: $APP_CONFIG"
