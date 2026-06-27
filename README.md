@@ -36,7 +36,7 @@ myblog/
 
 ### 基础设施
 - **反向代理**: Nginx
-- **配置管理**: application.properties
+- **配置管理**: application.yml
 
 ## 快速开始
 
@@ -91,41 +91,43 @@ docker run -d -p 6379:6379 redis:alpine
 
 #### 4. 配置后端
 
-编辑 `server/src/main/resources/application.properties`：
+编辑 `server/src/main/resources/application.yml`：
 
-```properties
-# 服务端口和 API 前缀
-server.port=8081
-server.servlet.context-path=/api
+```yaml
+server:
+  port: 8081
+  servlet:
+    context-path: /api
 
-# 修改数据库连接信息
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/blog_db
+    username: your_mysql_username
+    password: your_mysql_password
+  data:
+    redis:
+      host: localhost
+      port: 6379
 
-spring.datasource.url=jdbc:mysql://localhost:3306/blog_db
-spring.datasource.username=your_mysql_username
-spring.datasource.password=your_mysql_password
-
-# 修改 Redis 连接信息（未使用 Redis 的环境可不配置/不启动）
-
-spring.data.redis.host=localhost
-spring.data.redis.port=6379
-
-# 修改 JWT 密钥（生产环境请使用强密钥）
-
-app.jwt.secret=your-secret-key-here
-
-# 修改管理员密码（BCrypt 加密）
-
-app.admin.password=$2a$10$MqoKK/5vKGk91GKHOB.2wu0D1LT871T8Kae7jWlAybkE9NbpHKHoq
+app:
+  jwt:
+    secret: your-secret-key-here
+  admin:
+    password: $2a$10$MqoKK/5vKGk91GKHOB.2wu0D1LT871T8Kae7jWlAybkE9NbpHKHoq
+  docs:
+    path: /path/to/your/docs
+  image:
+    storage:
+      path: /path/to/static/images
+  attachment:
+    storage:
+      path: /path/to/static/attachments
+  frontend:
+    dist:
+      path: /path/to/frontend/dist
+```
 
 这里保存的是管理员密码的 BCrypt 哈希值，不是明文密码。修改时请先用 `BCryptPasswordEncoder` 重新生成哈希，再替换这里的值。
-
-# 修改文档路径
-
-app.docs.path=/path/to/your/docs
-app.image.storage.path=/path/to/static/images
-app.attachment.storage.path=/path/to/static/attachments
-app.frontend.dist.path=/path/to/frontend/dist
-```
 
 #### 5. 配置 Nginx
 
@@ -232,7 +234,7 @@ cd server
 - 图片目录：`/opt/myblog/static/images`
 - 附件目录：`/opt/myblog/static/attachments`
 - 后端 JAR：`/opt/myblog/app.jar`
-- 后端配置：`/opt/myblog/application.properties`
+- 后端配置：`/opt/myblog/application.yml`
 - 后端日志：`/opt/myblog/app.log`
 - 后端 API：`http://127.0.0.1:8081/api`
 
@@ -246,21 +248,32 @@ cd server
 | `BACKEND_UPSTREAM` | `http://127.0.0.1:8081` | Nginx 反向代理上游 |
 | `BACKEND_CONTEXT_PATH` | `/api` | 后端 API 前缀 |
 | `APP_JAR` | `/opt/myblog/app.jar` | 后端 JAR 路径 |
-| `APP_CONFIG` | `/opt/myblog/application.properties` | 后端配置文件 |
+| `APP_CONFIG` | `/opt/myblog/application.yml` | 后端配置文件 |
 | `APP_LOG` | `/opt/myblog/app.log` | 后端日志文件 |
 | `DOCS_DIR` | `/opt/myblog/docs` | 管理文档目录，映射 `/api/docs-static/**` 和 `/docs-static/**` |
 | `IMAGE_DIR` | `/opt/myblog/static/images` | 图片静态资源目录 |
 | `ATTACHMENT_DIR` | `/opt/myblog/static/attachments` | 附件静态资源目录 |
 
-对应后端 `application.properties`：
+对应后端 `application.yml`：
 
-```properties
-server.port=8081
-server.servlet.context-path=/api
-app.docs.path=/opt/myblog/docs
-app.image.storage.path=/opt/myblog/static/images
-app.attachment.storage.path=/opt/myblog/static/attachments
-app.frontend.dist.path=/opt/myblog/dist
+```yaml
+server:
+  port: 8081
+  servlet:
+    context-path: /api
+
+app:
+  docs:
+    path: /opt/myblog/docs
+  image:
+    storage:
+      path: /opt/myblog/static/images
+  attachment:
+    storage:
+      path: /opt/myblog/static/attachments
+  frontend:
+    dist:
+      path: /opt/myblog/dist
 ```
 
 #### 1. 构建前端
@@ -302,7 +315,7 @@ cd /opt/myblog
 mv app.jar app.jar.old 2>/dev/null || true
 mv app.jar.new app.jar
 pkill -f 'java.*app.jar' 2>/dev/null || true
-LANG=C.UTF-8 LC_ALL=C.UTF-8 nohup java -Dfile.encoding=UTF-8 -jar app.jar --spring.config.location=/opt/myblog/application.properties > /opt/myblog/app.log 2>&1 &
+LANG=C.UTF-8 LC_ALL=C.UTF-8 nohup java -Dfile.encoding=UTF-8 -jar app.jar --spring.config.location=/opt/myblog/application.yml > /opt/myblog/app.log 2>&1 &
 ```
 
 或使用 systemd 服务：
@@ -316,7 +329,7 @@ After=network.target
 Type=simple
 User=root
 WorkingDirectory=/opt/myblog
-ExecStart=/usr/bin/java -Dfile.encoding=UTF-8 -jar /opt/myblog/app.jar --spring.config.location=/opt/myblog/application.properties
+ExecStart=/usr/bin/java -Dfile.encoding=UTF-8 -jar /opt/myblog/app.jar --spring.config.location=/opt/myblog/application.yml
 Restart=always
 RestartSec=10
 
@@ -379,7 +392,7 @@ NGINX_CONF=/etc/nginx/conf.d/myblog.conf \
 | `IMAGE_DIR` | `$APP_ROOT/static/images` | 图片目录 |
 | `ATTACHMENT_DIR` | `$APP_ROOT/static/attachments` | 附件目录 |
 | `APP_JAR` | `$APP_ROOT/app.jar` | 后端 JAR |
-| `APP_CONFIG` | `$APP_ROOT/application.properties` | 后端配置 |
+| `APP_CONFIG` | `$APP_ROOT/application.yml` | 后端配置 |
 | `APP_LOG` | `$APP_ROOT/app.log` | 后端日志 |
 | `BACKEND_PORT` | `8081` | 后端端口 |
 | `BACKEND_CONTEXT_PATH` | `/api` | API 前缀 |

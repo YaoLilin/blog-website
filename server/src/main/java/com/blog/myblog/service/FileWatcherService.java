@@ -17,10 +17,13 @@ import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -114,10 +117,11 @@ public class FileWatcherService {
             log.info("文件已删除: {}", path);
             String absolutePath = file.getAbsolutePath();
             if (file.getName().endsWith(".md")) {
-                articleRepository.findByFilePath(absolutePath).ifPresent(article -> {
-                    articleRepository.delete(article);
-                    log.info("已同步删除文章: {}", article.getTitle());
-                });
+                List<Article> articles = articleRepository.findByFilePathOrderByIdAsc(absolutePath);
+                if (!articles.isEmpty()) {
+                    articleRepository.deleteAll(articles);
+                    log.info("已同步删除文章: {}（共 {} 条）", articles.get(0).getTitle(), articles.size());
+                }
             } else {
                 List<Article> orphaned = articleRepository.findByFilePathStartingWith(absolutePath + "/");
                 if (!orphaned.isEmpty()) {
@@ -159,6 +163,7 @@ public class FileWatcherService {
         } else {
             log.info("全量同步完成，无孤立文章");
         }
+        cleanupDuplicateServerManagedArticles();
 
         List<Category> orphanCats = categoryRepository.findAll().stream()
                 .filter(c -> Boolean.TRUE.equals(c.getIsServerManaged()))
@@ -279,11 +284,13 @@ public class FileWatcherService {
             LocalDateTime fileModified = LocalDateTime.ofInstant(
                     Files.getLastModifiedTime(file.toPath()).toInstant(), ZoneId.systemDefault());
 
-            articleRepository.findByFilePath(path).ifPresentOrElse(article -> {
+            resolveCanonicalArticle(path).ifPresentOrElse(article -> {
                 try {
                     if (article.getUpdatedAt() == null || fileModified.isAfter(article.getUpdatedAt())) {
                         article.setContent(content);
-                        article.setTitle(title);
+                        if (article.getTitle() == null || article.getTitle().isBlank()) {
+                            article.setTitle(title);
+                        }
                         articleRepository.save(article);
                         log.info("已从文件同步文章: {}", title);
                     }
@@ -301,10 +308,12 @@ public class FileWatcherService {
         try {
             String content = Files.readString(file.toPath());
             String title = extractTitle(file.getName(), content);
-            articleRepository.findByFilePath(path).ifPresentOrElse(article -> {
+            resolveCanonicalArticle(path).ifPresentOrElse(article -> {
                 try {
                     article.setContent(content);
-                    article.setTitle(title);
+                    if (article.getTitle() == null || article.getTitle().isBlank()) {
+                        article.setTitle(title);
+                    }
                     articleRepository.save(article);
                 } catch (Exception e) {
                     log.error("更新文章失败: {}", path, e);
@@ -325,6 +334,42 @@ public class FileWatcherService {
             });
         } catch (IOException e) {
             log.error("读取文件失败: {}", path, e);
+        }
+    }
+
+    private java.util.Optional<Article> resolveCanonicalArticle(String path) {
+        List<Article> articles = articleRepository.findByFilePathOrderByIdAsc(path);
+        if (articles.isEmpty()) {
+            return java.util.Optional.empty();
+        }
+
+        Article primary = articles.get(0);
+        if (articles.size() > 1) {
+            List<Article> duplicates = new ArrayList<>(articles.subList(1, articles.size()));
+            articleRepository.deleteAll(duplicates);
+            log.warn("检测到重复的服务器管理文章路径，已清理 {} 条重复记录: {}", duplicates.size(), path);
+        }
+        return java.util.Optional.of(primary);
+    }
+
+    private void cleanupDuplicateServerManagedArticles() {
+        Map<String, List<Article>> duplicatesByPath = articleRepository.findAll().stream()
+                .filter(article -> Boolean.TRUE.equals(article.getIsServerManaged()))
+                .filter(article -> article.getFilePath() != null && !article.getFilePath().isBlank())
+                .collect(Collectors.groupingBy(Article::getFilePath));
+
+        List<Article> duplicates = duplicatesByPath.values().stream()
+                .filter(articles -> articles.size() > 1)
+                .flatMap(articles -> articles.stream()
+                        .sorted((left, right) -> Long.compare(
+                                left.getId() == null ? Long.MAX_VALUE : left.getId(),
+                                right.getId() == null ? Long.MAX_VALUE : right.getId()))
+                        .skip(1))
+                .toList();
+
+        if (!duplicates.isEmpty()) {
+            articleRepository.deleteAll(duplicates);
+            log.warn("全量同步时清理了 {} 条重复的服务器管理文章路径记录", duplicates.size());
         }
     }
 

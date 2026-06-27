@@ -72,7 +72,8 @@ public class ArticleService {
 
     public ArticleDto getByFilePath(String path) {
         String filePath = resolveFilePath(path);
-        return articleRepository.findByFilePath(filePath)
+        return articleRepository.findByFilePathOrderByIdAsc(filePath).stream()
+                .findFirst()
                 .map(this::toDto)
                 .orElseGet(() -> loadFromFile(filePath));
     }
@@ -136,11 +137,7 @@ public class ArticleService {
     public ArticleDto update(Long id, ArticleDto dto) {
         Article article = articleRepository.findById(id).orElseThrow();
         if (dto.getTitle() != null) {
-            if (Boolean.TRUE.equals(article.getIsServerManaged()) && article.getFilePath() != null) {
-                renameServerManagedFile(article, dto.getTitle());
-            } else {
-                article.setTitle(dto.getTitle());
-            }
+            article.setTitle(dto.getTitle().trim());
         }
         if (dto.getContent() != null) {
             if (Boolean.TRUE.equals(article.getIsServerManaged()) && article.getFilePath() != null) {
@@ -300,41 +297,6 @@ public class ArticleService {
         }
         matcher.appendTail(sb);
         return sb.toString();
-    }
-
-    private void renameServerManagedFile(Article article, String newTitle) {
-        if (newTitle == null || newTitle.isBlank()) return;
-        String oldFilePath = article.getFilePath();
-        if (oldFilePath == null) {
-            article.setTitle(newTitle);
-            return;
-        }
-
-        try {
-            String cleanTitle = newTitle.trim().replaceAll("[\\\\/]", "");
-            Path oldPath = Path.of(oldFilePath);
-            String fileName = oldPath.getFileName().toString();
-            int dot = fileName.lastIndexOf('.');
-            String ext = dot >= 0 ? fileName.substring(dot) : ".md";
-            String newFileName = cleanTitle.endsWith(ext) ? cleanTitle : cleanTitle + ext;
-            Path target = oldPath.resolveSibling(newFileName);
-
-            if (oldPath.equals(target)) {
-                article.setTitle(cleanTitle);
-                article.setFilePath(target.toString());
-                return;
-            }
-
-            if (Files.exists(oldPath)) {
-                Files.move(oldPath, target, StandardCopyOption.REPLACE_EXISTING);
-            } else if (article.getContent() != null) {
-                Files.writeString(target, article.getContent());
-            }
-            article.setTitle(cleanTitle);
-            article.setFilePath(target.toString());
-        } catch (Exception e) {
-            // 仅重命名失败时保留旧路径，避免中断数据库更新
-        }
     }
 
     /**
@@ -538,7 +500,7 @@ public class ArticleService {
     public ArticleDto toDto(Article article) {
         ArticleDto dto = new ArticleDto();
         dto.setId(article.getId());
-        dto.setTitle(Boolean.TRUE.equals(article.getIsServerManaged()) && article.getFilePath() != null
+        dto.setTitle((article.getTitle() == null || article.getTitle().isBlank()) && article.getFilePath() != null
                 ? stripExtension(new File(article.getFilePath()).getName())
                 : article.getTitle());
 

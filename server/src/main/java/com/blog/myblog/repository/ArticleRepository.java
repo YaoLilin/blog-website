@@ -25,6 +25,7 @@ public interface ArticleRepository extends JpaRepository<Article, Long> {
     List<Article> findTopByViewCount(Pageable pageable);
 
     List<Article> findByFilePathAndIsServerManagedTrue(String filePath);
+    List<Article> findByFilePathOrderByIdAsc(String filePath);
     Optional<Article> findByFilePath(String filePath);
     List<Article> findByFilePathStartingWith(String prefix);
 }
