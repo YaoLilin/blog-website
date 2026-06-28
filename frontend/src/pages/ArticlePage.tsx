@@ -272,6 +272,10 @@ export function ArticlePage() {
       const updated = await api.updateArticle(article.id, {
         title: editTitle,
         content: editContent,
+        categoryId: article.categoryId,
+        filePath: article.filePath,
+        isServerManaged: article.isServerManaged,
+        isRecommended: article.isRecommended,
       })
       setArticle(updated)
       setEditMode(false)

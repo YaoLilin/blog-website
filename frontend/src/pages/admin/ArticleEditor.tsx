@@ -28,7 +28,14 @@ export function ArticleEditor({ article, categoryId, onSave }: Props) {
     try {
       let saved: Article
       if (article) {
-        saved = await api.updateArticle(article.id, { title, content })
+        saved = await api.updateArticle(article.id, {
+          title,
+          content,
+          categoryId: article.categoryId,
+          filePath: article.filePath,
+          isServerManaged: article.isServerManaged,
+          isRecommended: article.isRecommended,
+        })
       } else {
         saved = await api.createArticle({ title, content, categoryId })
       }

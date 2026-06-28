@@ -1,6 +1,7 @@
 package com.blog.myblog.service;
 
 import com.blog.myblog.dto.ArticleDto;
+import com.blog.myblog.dto.CategoryDto;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -11,6 +12,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -34,7 +37,7 @@ public class SeoHtmlService {
     private String siteAuthor;
 
     public String renderArticlePage(ArticleDto article, String canonicalUrl) {
-        String title = safeTitle(article);
+        String title = buildSeoTitle(article);
         String description = buildDescription(article.getContent());
         String articleHtml = buildArticleHtml(article);
         String indexHtml = readIndexHtml();
@@ -229,6 +232,29 @@ public class SeoHtmlService {
 
     private String safeTitle(ArticleDto article) {
         return article.getTitle() == null || article.getTitle().isBlank() ? "文章" : article.getTitle().trim();
+    }
+
+    private String buildSeoTitle(ArticleDto article) {
+        List<String> parts = new ArrayList<>();
+        CategoryDto category = article.getCategory();
+        if (category != null) {
+            if (category.getFilePath() != null && !category.getFilePath().isBlank()) {
+                for (String segment : category.getFilePath().split("/")) {
+                    String trimmed = segment == null ? "" : segment.trim();
+                    if (!trimmed.isBlank()) {
+                        parts.add(trimmed);
+                    }
+                }
+            } else if (category.getName() != null && !category.getName().isBlank()) {
+                parts.add(category.getName().trim());
+            }
+        }
+
+        String articleTitle = safeTitle(article);
+        if (parts.isEmpty() || !articleTitle.equals(parts.get(parts.size() - 1))) {
+            parts.add(articleTitle);
+        }
+        return String.join(" > ", parts);
     }
 
     public String canonicalForArticle(String baseUrl, Long id) {

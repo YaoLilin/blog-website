@@ -35,6 +35,11 @@ app:
   site:
     name: 姚礼林的博客
     author: 姚礼林
+    base-url: http://localhost:5173
+  index-now:
+    enabled: false
+    key: ""
+    endpoint: https://www.bing.com/indexnow
   docs:
     path: /Users/yaolilin/IdeaProjects/myblog/server/docs
   image:

@@ -4,6 +4,7 @@ import com.blog.myblog.dto.ArticleDto;
 import com.blog.myblog.entity.Article;
 import com.blog.myblog.repository.ArticleRepository;
 import com.blog.myblog.repository.CategoryRepository;
+import com.blog.myblog.repository.SystemSettingRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -11,12 +12,15 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.lang.reflect.Proxy;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ArticleServiceTest {
@@ -40,7 +44,7 @@ class ArticleServiceTest {
                 articleRepository.proxy(),
                 emptyCategoryRepository(),
                 null,
-                null
+                emptySystemSettingService()
         );
         ReflectionTestUtils.setField(service, "docsPath", tempDir.toString());
 
@@ -68,13 +72,46 @@ class ArticleServiceTest {
                 emptyArticleRepository(),
                 emptyCategoryRepository(),
                 null,
-                null
+                emptySystemSettingService()
         );
         ReflectionTestUtils.setField(service, "docsPath", tempDir.toString());
 
         ArticleDto dto = service.toDto(article);
 
         assertEquals("Database Title", dto.getTitle());
+    }
+
+    @Test
+    void updateRecreatesMissingServerManagedArticleFromFilePath() throws Exception {
+        Path articleFile = tempDir.resolve("server-managed.md");
+        Files.writeString(articleFile, "# Heading\nold");
+
+        TestArticleRepository articleRepository = new TestArticleRepository();
+        ArticleService service = new ArticleService(
+                articleRepository.proxy(),
+                emptyCategoryRepository(),
+                null,
+                emptySystemSettingService()
+        );
+        ReflectionTestUtils.setField(service, "docsPath", tempDir.toString());
+        ReflectionTestUtils.setField(service, "imageStoragePath", tempDir.resolve("images").toString());
+        ReflectionTestUtils.setField(service, "attachmentStoragePath", tempDir.resolve("attachments").toString());
+
+        ArticleDto dto = new ArticleDto();
+        dto.setTitle("Recovered Title");
+        dto.setContent("new content");
+        dto.setCategoryId(9L);
+        dto.setFilePath(articleFile.toString());
+        dto.setIsServerManaged(true);
+        dto.setIsRecommended(true);
+
+        ArticleDto updated = service.update(103L, dto);
+
+        assertNotNull(updated.getId());
+        assertEquals("Recovered Title", updated.getTitle());
+        assertEquals(articleFile.toString(), updated.getFilePath());
+        assertTrue(updated.getIsServerManaged());
+        assertEquals(9L, updated.getCategoryId());
     }
 
     private static ArticleRepository emptyArticleRepository() {
@@ -91,6 +128,15 @@ class ArticleServiceTest {
                 new Class<?>[]{CategoryRepository.class},
                 (proxy, method, args) -> defaultValue(method.getReturnType())
         );
+    }
+
+    private static SystemSettingService emptySystemSettingService() {
+        SystemSettingRepository repository = (SystemSettingRepository) Proxy.newProxyInstance(
+                SystemSettingRepository.class.getClassLoader(),
+                new Class<?>[]{SystemSettingRepository.class},
+                (proxy, method, args) -> defaultValue(method.getReturnType())
+        );
+        return new SystemSettingService(repository);
     }
 
     private static Object defaultValue(Class<?> returnType) {
@@ -111,9 +157,14 @@ class ArticleServiceTest {
 
     private static class TestArticleRepository {
         private final Map<Long, Article> articles = new HashMap<>();
+        private long nextId = 1L;
+
+        private TestArticleRepository() {
+        }
 
         private TestArticleRepository(Article article) {
             this.articles.put(article.getId(), article);
+            this.nextId = Math.max(this.nextId, article.getId() + 1);
         }
 
         private ArticleRepository proxy() {
@@ -124,8 +175,22 @@ class ArticleServiceTest {
                         if ("findById".equals(method.getName())) {
                             return Optional.ofNullable(articles.get(args[0]));
                         }
+                        if ("findByFilePathOrderByIdAsc".equals(method.getName())) {
+                            String filePath = (String) args[0];
+                            List<Article> matches = new ArrayList<>();
+                            for (Article article : articles.values()) {
+                                if (filePath.equals(article.getFilePath())) {
+                                    matches.add(article);
+                                }
+                            }
+                            matches.sort((a, b) -> Long.compare(a.getId(), b.getId()));
+                            return matches;
+                        }
                         if ("save".equals(method.getName())) {
                             Article article = (Article) args[0];
+                            if (article.getId() == null) {
+                                article.setId(nextId++);
+                            }
                             articles.put(article.getId(), article);
                             return article;
                         }
