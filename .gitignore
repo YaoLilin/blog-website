@@ -35,6 +35,8 @@ frontend/*.local
 .idea
 .vscode
 .claude
+AGENTS.md
+CLAUDE.md
 
 server/server/static
 server/static
