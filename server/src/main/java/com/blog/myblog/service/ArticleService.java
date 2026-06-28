@@ -10,6 +10,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
 
 import java.io.File;
 import java.io.IOException;
@@ -67,7 +69,8 @@ public class ArticleService {
     }
 
     public ArticleDto getById(Long id) {
-        return toDto(articleRepository.findById(id).orElseThrow());
+        return toDto(articleRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "文章不存在")));
     }
 
     public ArticleDto getByFilePath(String path) {
@@ -135,7 +138,9 @@ public class ArticleService {
 
     @Transactional
     public ArticleDto update(Long id, ArticleDto dto) {
-        Article article = articleRepository.findById(id).orElseThrow();
+        Article article = articleRepository.findById(id)
+                .orElseGet(() -> recoverServerManagedArticle(dto)
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "文章不存在")));
         if (dto.getTitle() != null) {
             article.setTitle(dto.getTitle().trim());
         }
@@ -151,6 +156,37 @@ public class ArticleService {
         if (dto.getCategoryId() != null) article.setCategoryId(dto.getCategoryId());
         if (dto.getIsRecommended() != null) article.setIsRecommended(dto.getIsRecommended());
         return toDto(articleRepository.save(article));
+    }
+
+    private java.util.Optional<Article> recoverServerManagedArticle(ArticleDto dto) {
+        if (dto == null || !Boolean.TRUE.equals(dto.getIsServerManaged()) || dto.getFilePath() == null || dto.getFilePath().isBlank()) {
+            return java.util.Optional.empty();
+        }
+
+        String filePath = resolveFilePath(dto.getFilePath());
+        List<Article> existing = articleRepository.findByFilePathOrderByIdAsc(filePath);
+        if (!existing.isEmpty()) {
+            return java.util.Optional.of(existing.get(0));
+        }
+
+        Path path;
+        try {
+            path = Path.of(filePath).normalize();
+        } catch (Exception e) {
+            return java.util.Optional.empty();
+        }
+        if (!Files.exists(path) || !Files.isRegularFile(path)) {
+            return java.util.Optional.empty();
+        }
+
+        Article article = new Article();
+        article.setTitle(dto.getTitle() != null ? dto.getTitle().trim() : stripExtension(path.getFileName().toString()));
+        article.setContent(dto.getContent() != null ? dto.getContent() : "");
+        article.setCategoryId(dto.getCategoryId());
+        article.setIsRecommended(dto.getIsRecommended() != null ? dto.getIsRecommended() : false);
+        article.setIsServerManaged(true);
+        article.setFilePath(filePath);
+        return java.util.Optional.of(articleRepository.save(article));
     }
 
     @Transactional

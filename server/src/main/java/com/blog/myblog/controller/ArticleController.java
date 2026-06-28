@@ -5,6 +5,7 @@ import com.blog.myblog.dto.CategoryDto;
 import com.blog.myblog.service.ArticleService;
 import com.blog.myblog.service.CategoryService;
 import com.blog.myblog.service.GitService;
+import com.blog.myblog.service.IndexNowService;
 import com.blog.myblog.service.ViewService;
 import com.blog.myblog.util.BrowserRequestDetector;
 import jakarta.servlet.http.HttpServletRequest;
@@ -26,6 +27,7 @@ public class ArticleController {
     private final ViewService viewService;
     private final GitService gitService;
     private final CategoryService categoryService;
+    private final IndexNowService indexNowService;
 
     @GetMapping
     public Page<ArticleDto> getList(
@@ -64,17 +66,23 @@ public class ArticleController {
 
     @PostMapping
     public ArticleDto create(@RequestBody ArticleDto dto) {
-        return articleService.create(dto);
+        ArticleDto article = articleService.create(dto);
+        indexNowService.submitArticle(article.getId());
+        return article;
     }
 
     @PutMapping("/{id}")
     public ArticleDto update(@PathVariable Long id, @RequestBody ArticleDto dto) {
-        return articleService.update(id, dto);
+        ArticleDto article = articleService.update(id, dto);
+        indexNowService.submitArticle(article.getId());
+        return article;
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
+        articleService.getById(id);
         articleService.delete(id);
+        indexNowService.submitArticle(id);
         return ResponseEntity.noContent().build();
     }
 

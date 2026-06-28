@@ -3,6 +3,7 @@ package com.blog.myblog.controller;
 import com.blog.myblog.dto.CategoryDto;
 import com.blog.myblog.service.CategoryService;
 import com.blog.myblog.service.FileWatcherService;
+import com.blog.myblog.service.IndexNowService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -17,6 +18,7 @@ public class CategoryController {
 
     private final CategoryService categoryService;
     private final FileWatcherService fileWatcherService;
+    private final IndexNowService indexNowService;
 
     @GetMapping
     public List<CategoryDto> getAll() {
@@ -64,6 +66,7 @@ public class CategoryController {
     @PostMapping("/sync")
     public ResponseEntity<Void> sync() {
         fileWatcherService.fullSync();
+        indexNowService.submitAllArticles();
         return ResponseEntity.ok().build();
     }
 }

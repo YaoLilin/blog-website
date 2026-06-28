@@ -114,6 +114,11 @@ app:
     secret: your-secret-key-here
   admin:
     password: $2a$10$MqoKK/5vKGk91GKHOB.2wu0D1LT871T8Kae7jWlAybkE9NbpHKHoq
+  site:
+    base-url: https://your-domain.com
+  index-now:
+    enabled: true
+    key: your-indexnow-key
   docs:
     path: /path/to/your/docs
   image:
@@ -128,6 +133,13 @@ app:
 ```
 
 这里保存的是管理员密码的 BCrypt 哈希值，不是明文密码。修改时请先用 `BCryptPasswordEncoder` 重新生成哈希，再替换这里的值。
+
+如果启用 `IndexNow`：
+
+- `app.site.base-url` 填站点公开访问地址，例如 `https://yaolilin.com`
+- `app.index-now.key` 填你申请或生成的 key
+- 后端启动后会自动在 `app.frontend.dist.path` 根目录写入 `{key}.txt`
+- 文章新增、编辑、删除，以及后台“同步文章”完成后，后端会自动向 Bing 的 `IndexNow` 接口提交文章 URL
 
 #### 5. 配置 Nginx
 
@@ -274,6 +286,11 @@ app:
   frontend:
     dist:
       path: /opt/myblog/dist
+  site:
+    base-url: https://your-domain.com
+  index-now:
+    enabled: true
+    key: your-indexnow-key
 ```
 
 #### 1. 构建前端
