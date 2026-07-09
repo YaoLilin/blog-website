@@ -1,5 +1,7 @@
 package com.blog.myblog.service;
 
+import com.blog.myblog.datasource.ReadDb;
+import com.blog.myblog.datasource.WriteDb;
 import com.blog.myblog.dto.ArticleDto;
 import com.blog.myblog.entity.Article;
 import com.blog.myblog.repository.ArticleRepository;
@@ -24,8 +26,11 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -37,6 +42,7 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.FileTime;
 
 @Service
+@ReadDb
 @RequiredArgsConstructor
 public class ArticleService {
 
@@ -63,9 +69,69 @@ public class ArticleService {
 
     public Page<ArticleDto> getList(Long categoryId, int page, int size) {
         if (categoryId != null) {
-            return articleRepository.findByCategoryId(categoryId, PageRequest.of(page, size)).map(this::toDto);
+            List<Article> deduped = dedupeServerManagedArticles(
+                    articleRepository.findByCategoryId(categoryId, PageRequest.of(page, size)).getContent()
+            );
+            List<ArticleDto> content = deduped.stream().map(this::toDto).toList();
+            return new org.springframework.data.domain.PageImpl<>(content, PageRequest.of(page, size), content.size());
         }
         return articleRepository.findAll(PageRequest.of(page, size)).map(this::toDto);
+    }
+
+    private List<Article> dedupeServerManagedArticles(List<Article> articles) {
+        Map<String, Article> unique = new LinkedHashMap<>();
+        for (Article article : articles) {
+            String key = canonicalArticleKey(article);
+            Article existing = unique.get(key);
+            if (existing == null || compareArticlePriority(article, existing) < 0) {
+                unique.put(key, article);
+            }
+        }
+        return new ArrayList<>(unique.values());
+    }
+
+    private String canonicalArticleKey(Article article) {
+        if (!Boolean.TRUE.equals(article.getIsServerManaged()) || article.getFilePath() == null || article.getFilePath().isBlank()) {
+            return "id:" + article.getId();
+        }
+
+        try {
+            Path configuredDocs = Path.of(docsPath).toAbsolutePath().normalize();
+            Path articlePath = Path.of(article.getFilePath()).toAbsolutePath().normalize();
+            if (articlePath.startsWith(configuredDocs)) {
+                return "server:" + configuredDocs.relativize(articlePath).toString().replace('\\', '/');
+            }
+        } catch (Exception ignored) {
+        }
+
+        String normalized = article.getFilePath().replace('\\', '/');
+        int docsIndex = normalized.indexOf("/docs/");
+        if (docsIndex >= 0) {
+            return "server:" + normalized.substring(docsIndex + "/docs/".length());
+        }
+        return "path:" + normalized;
+    }
+
+    private int compareArticlePriority(Article left, Article right) {
+        return Comparator
+                .comparingInt((Article article) -> pathPriority(article.getFilePath()))
+                .thenComparing(article -> article.getId() == null ? Long.MAX_VALUE : article.getId())
+                .compare(left, right);
+    }
+
+    private int pathPriority(String filePath) {
+        if (filePath == null || filePath.isBlank()) {
+            return Integer.MAX_VALUE;
+        }
+        try {
+            Path configuredDocs = Path.of(docsPath).toAbsolutePath().normalize();
+            Path articlePath = Path.of(filePath).toAbsolutePath().normalize();
+            if (articlePath.startsWith(configuredDocs)) {
+                return 0;
+            }
+        } catch (Exception ignored) {
+        }
+        return 1;
     }
 
     public ArticleDto getById(Long id) {
@@ -126,6 +192,7 @@ public class ArticleService {
     }
 
     @Transactional
+    @WriteDb
     public ArticleDto create(ArticleDto dto) {
         Article article = new Article();
         article.setTitle(dto.getTitle());
@@ -137,6 +204,7 @@ public class ArticleService {
     }
 
     @Transactional
+    @WriteDb
     public ArticleDto update(Long id, ArticleDto dto) {
         Article article = articleRepository.findById(id)
                 .orElseGet(() -> recoverServerManagedArticle(dto)
@@ -190,6 +258,7 @@ public class ArticleService {
     }
 
     @Transactional
+    @WriteDb
     public void delete(Long id) {
         articleRepository.deleteById(id);
     }

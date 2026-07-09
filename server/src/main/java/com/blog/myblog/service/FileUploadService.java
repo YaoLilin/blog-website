@@ -1,5 +1,6 @@
 package com.blog.myblog.service;
 
+import com.blog.myblog.datasource.WriteDb;
 import com.blog.myblog.entity.Attachment;
 import com.blog.myblog.entity.Image;
 import com.blog.myblog.repository.AttachmentRepository;
@@ -15,6 +16,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Service
+@WriteDb
 @RequiredArgsConstructor
 public class FileUploadService {
 

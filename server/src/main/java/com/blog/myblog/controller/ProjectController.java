@@ -1,5 +1,7 @@
 package com.blog.myblog.controller;
 
+import com.blog.myblog.datasource.ReadDb;
+import com.blog.myblog.datasource.WriteDb;
 import com.blog.myblog.dto.ProjectDto;
 import com.blog.myblog.service.ProjectService;
 import lombok.RequiredArgsConstructor;
@@ -10,6 +12,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/projects")
+@ReadDb
 @RequiredArgsConstructor
 public class ProjectController {
 
@@ -26,16 +29,19 @@ public class ProjectController {
     }
 
     @PostMapping
+    @WriteDb
     public ProjectDto create(@RequestBody ProjectDto dto) {
         return projectService.create(dto);
     }
 
     @PutMapping("/{id}")
+    @WriteDb
     public ProjectDto update(@PathVariable Long id, @RequestBody ProjectDto dto) {
         return projectService.update(id, dto);
     }
 
     @DeleteMapping("/{id}")
+    @WriteDb
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         projectService.delete(id);
         return ResponseEntity.noContent().build();

@@ -7,6 +7,7 @@ import type { Article, Category } from '../types'
 import { Button } from '../components/ui/button'
 import { formatDate } from '../lib/utils'
 import { formatCategoryPath } from '../lib/category'
+import { dedupeArticles } from '../lib/articles'
 import { CategoryCover } from '../components/CategoryCover'
 import { SITE_CONFIG } from '../config/site'
 
@@ -57,7 +58,7 @@ export async function loader({ params }: { params: { id?: string } }): Promise<C
     currentCategory: cat,
     breadcrumb: path,
     subCategories: cat?.children || [],
-    articles: r.content,
+    articles: dedupeArticles(r.content || []),
     recentArticles,
   }
 }
@@ -249,7 +250,7 @@ function TreeNode({ category, depth = 0 }: { category: Category; depth?: number 
 
   useEffect(() => {
     if (articles.length === 0) {
-      api.getArticles({ categoryId: category.id }).then(r => setArticles(r.content || [])).catch(() => {})
+      api.getArticles({ categoryId: category.id }).then(r => setArticles(dedupeArticles(r.content || []))).catch(() => {})
     }
   }, [])
 
@@ -257,7 +258,7 @@ function TreeNode({ category, depth = 0 }: { category: Category; depth?: number 
     const next = !expanded
     setExpanded(next)
     if (next && articles.length === 0) {
-      api.getArticles({ categoryId: category.id }).then(r => setArticles(r.content || [])).catch(() => {})
+      api.getArticles({ categoryId: category.id }).then(r => setArticles(dedupeArticles(r.content || []))).catch(() => {})
     }
   }
 

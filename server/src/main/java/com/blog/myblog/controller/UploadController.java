@@ -1,5 +1,6 @@
 package com.blog.myblog.controller;
 
+import com.blog.myblog.datasource.WriteDb;
 import com.blog.myblog.service.FileUploadService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -10,6 +11,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/upload")
+@WriteDb
 @RequiredArgsConstructor
 public class UploadController {
 

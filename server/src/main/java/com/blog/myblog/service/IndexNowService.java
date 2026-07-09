@@ -39,7 +39,7 @@ public class IndexNowService {
     private final ArticleRepository articleRepository;
     private final ObjectMapper objectMapper;
 
-    @Value("${app.frontend.dist.path}")
+    @Value("${app.frontend.dist.path:/opt/myblog/dist}")
     private String frontendDistPath;
 
     @Value("${app.site.base-url:}")
@@ -66,13 +66,16 @@ public class IndexNowService {
     }
 
     public void submitArticle(Long articleId) {
-        if (articleId == null) {
+        if (articleId == null || !isConfigured()) {
             return;
         }
         submitUrls(List.of(buildArticleUrl(articleId)));
     }
 
     public void submitAllArticles() {
+        if (!isConfigured()) {
+            return;
+        }
         List<String> urls = articleRepository.findAll().stream()
                 .map(Article::getId)
                 .filter(id -> id != null)

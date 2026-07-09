@@ -114,6 +114,37 @@ class ArticleServiceTest {
         assertEquals(9L, updated.getCategoryId());
     }
 
+    @Test
+    void getListDedupesServerManagedArticlesWithLegacyDocsPaths() {
+        Article current = new Article();
+        current.setId(10L);
+        current.setTitle("欢迎");
+        current.setFilePath("/Users/yaolilin/IdeaProjects/myblog/server/docs/泛微开发/README.md");
+        current.setCategoryId(88L);
+        current.setIsServerManaged(true);
+
+        Article legacy = new Article();
+        legacy.setId(11L);
+        legacy.setTitle("欢迎");
+        legacy.setFilePath("/Users/yaolilin/myblog/docs/泛微开发/README.md");
+        legacy.setCategoryId(88L);
+        legacy.setIsServerManaged(true);
+
+        TestArticleRepository articleRepository = new TestArticleRepository(current, legacy);
+        ArticleService service = new ArticleService(
+                articleRepository.proxy(),
+                emptyCategoryRepository(),
+                null,
+                emptySystemSettingService()
+        );
+        ReflectionTestUtils.setField(service, "docsPath", "/Users/yaolilin/IdeaProjects/myblog/server/docs");
+
+        var page = service.getList(88L, 0, 20);
+
+        assertEquals(1, page.getContent().size());
+        assertEquals(10L, page.getContent().get(0).getId());
+    }
+
     private static ArticleRepository emptyArticleRepository() {
         return (ArticleRepository) Proxy.newProxyInstance(
                 ArticleRepository.class.getClassLoader(),
@@ -162,6 +193,13 @@ class ArticleServiceTest {
         private TestArticleRepository() {
         }
 
+        private TestArticleRepository(Article... articles) {
+            for (Article article : articles) {
+                this.articles.put(article.getId(), article);
+                this.nextId = Math.max(this.nextId, article.getId() + 1);
+            }
+        }
+
         private TestArticleRepository(Article article) {
             this.articles.put(article.getId(), article);
             this.nextId = Math.max(this.nextId, article.getId() + 1);
@@ -185,6 +223,14 @@ class ArticleServiceTest {
                             }
                             matches.sort((a, b) -> Long.compare(a.getId(), b.getId()));
                             return matches;
+                        }
+                        if ("findByCategoryId".equals(method.getName()) && args.length == 2) {
+                            Long categoryId = (Long) args[0];
+                            List<Article> matches = articles.values().stream()
+                                    .filter(article -> categoryId.equals(article.getCategoryId()))
+                                    .sorted((a, b) -> Long.compare(a.getId(), b.getId()))
+                                    .toList();
+                            return new org.springframework.data.domain.PageImpl<>(matches, (org.springframework.data.domain.Pageable) args[1], matches.size());
                         }
                         if ("save".equals(method.getName())) {
                             Article article = (Article) args[0];

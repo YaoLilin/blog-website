@@ -1,5 +1,7 @@
 package com.blog.myblog.controller;
 
+import com.blog.myblog.datasource.ReadDb;
+import com.blog.myblog.datasource.WriteDb;
 import com.blog.myblog.dto.ArticleDto;
 import com.blog.myblog.dto.CategoryDto;
 import com.blog.myblog.service.ArticleService;
@@ -20,6 +22,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/articles")
+@ReadDb
 @RequiredArgsConstructor
 public class ArticleController {
 
@@ -65,6 +68,7 @@ public class ArticleController {
     }
 
     @PostMapping
+    @WriteDb
     public ArticleDto create(@RequestBody ArticleDto dto) {
         ArticleDto article = articleService.create(dto);
         indexNowService.submitArticle(article.getId());
@@ -72,6 +76,7 @@ public class ArticleController {
     }
 
     @PutMapping("/{id}")
+    @WriteDb
     public ArticleDto update(@PathVariable Long id, @RequestBody ArticleDto dto) {
         ArticleDto article = articleService.update(id, dto);
         indexNowService.submitArticle(article.getId());
@@ -79,6 +84,7 @@ public class ArticleController {
     }
 
     @DeleteMapping("/{id}")
+    @WriteDb
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         articleService.getById(id);
         articleService.delete(id);
@@ -87,6 +93,7 @@ public class ArticleController {
     }
 
     @PostMapping("/{id}/view")
+    @WriteDb
     public ResponseEntity<Void> recordView(
             @PathVariable Long id,
             Authentication authentication,

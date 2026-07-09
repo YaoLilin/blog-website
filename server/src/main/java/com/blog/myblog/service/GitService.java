@@ -1,8 +1,14 @@
 package com.blog.myblog.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.MergeResult;
+import org.eclipse.jgit.api.PullCommand;
 import org.eclipse.jgit.api.PullResult;
+import org.eclipse.jgit.api.PushCommand;
+import org.eclipse.jgit.api.ResetCommand;
+import org.eclipse.jgit.api.errors.CheckoutConflictException;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
@@ -16,14 +22,17 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class GitService {
+    private static final String DEBUG_PREFIX = "[DEBUG-gitpull-20260709]";
 
     @Value("${app.docs.path}")
     private String docsPath;
@@ -44,18 +53,22 @@ public class GitService {
     }
 
     private Path locateGitDir(String repoRelativePath) {
+        Path docsRoot = Path.of(docsPath).toAbsolutePath().normalize();
         Path root = repoRelativePath == null || repoRelativePath.isBlank()
-                ? Path.of(docsPath)
-                : Path.of(docsPath).resolve(repoRelativePath);
+                ? docsRoot
+                : docsRoot.resolve(repoRelativePath).normalize();
+
+        if (!root.startsWith(docsRoot)) {
+            return null;
+        }
 
         Path current = root;
-        for (int i = 0; i < 10; i++) {
+        while (current != null && current.startsWith(docsRoot)) {
             Path gitDir = current.resolve(".git");
             if (Files.exists(gitDir)) {
                 return gitDir;
             }
             current = current.getParent();
-            if (current == null) break;
         }
         return null;
     }
@@ -93,20 +106,120 @@ public class GitService {
 
     public void push(String remoteName, String username, String password, String repoRelativePath) throws IOException, GitAPIException {
         try (Git git = openRepo(repoRelativePath)) {
-            CredentialsProvider cp = new UsernamePasswordCredentialsProvider(username, password);
-            git.push().setRemote(remoteName).setCredentialsProvider(cp).call();
+            PushCommand command = git.push().setRemote(remoteName);
+            CredentialsProvider cp = createCredentialsProvider(username, password);
+            if (cp != null) {
+                command.setCredentialsProvider(cp);
+            }
+            command.call();
         }
     }
 
-    public Map<String, Object> pull(String remoteName, String username, String password, String repoRelativePath) throws IOException, GitAPIException {
+    public Map<String, Object> pull(String remoteName, String username, String password, String repoRelativePath, boolean forceOverwrite) throws IOException, GitAPIException {
         Map<String, Object> result = new HashMap<>();
+        String opId = Long.toHexString(System.nanoTime());
+        long startedAt = System.nanoTime();
+        log.info("{} op={} pull start repoRelativePath={} remoteName={} forceOverwrite={}",
+                DEBUG_PREFIX, opId, repoRelativePath, remoteName, forceOverwrite);
         try (Git git = openRepo(repoRelativePath)) {
-            CredentialsProvider cp = new UsernamePasswordCredentialsProvider(username, password);
-            PullResult pullResult = git.pull().setRemote(remoteName).setCredentialsProvider(cp).call();
+            if (forceOverwrite) {
+                long discardStartedAt = System.nanoTime();
+                discardLocalChanges(git);
+                log.info("{} op={} discardLocalChanges finished in {} ms",
+                        DEBUG_PREFIX, opId, elapsedMillis(discardStartedAt));
+            }
+            long pullStartedAt = System.nanoTime();
+            PullResult pullResult = createPullCommand(git, remoteName, username, password).call();
+            log.info("{} op={} jgit pull finished in {} ms",
+                    DEBUG_PREFIX, opId, elapsedMillis(pullStartedAt));
             result.put("success", pullResult.isSuccessful());
-            result.put("hasConflicts", !pullResult.getMergeResult().getMergeStatus().isSuccessful());
+            result.put("hasConflicts", hasPullConflicts(pullResult));
+            log.info("{} op={} pull result success={} hasConflicts={}",
+                    DEBUG_PREFIX, opId, pullResult.isSuccessful(), hasPullConflicts(pullResult));
+        } catch (CheckoutConflictException e) {
+            log.warn("{} op={} checkout conflict after {} ms: {}",
+                    DEBUG_PREFIX, opId, elapsedMillis(startedAt), e.getMessage());
+            throw toPullConflictException(e);
+        } catch (Exception e) {
+            log.warn("{} op={} pull failed after {} ms: {}",
+                    DEBUG_PREFIX, opId, elapsedMillis(startedAt), e.getMessage(), e);
+            GitPullConflictException conflict = toPullConflictExceptionOrNull(e);
+            if (conflict != null) {
+                throw conflict;
+            }
+            throw e;
         }
+        log.info("{} op={} pull finished in {} ms",
+                DEBUG_PREFIX, opId, elapsedMillis(startedAt));
         return result;
+    }
+
+    private long elapsedMillis(long startedAt) {
+        return (System.nanoTime() - startedAt) / 1_000_000;
+    }
+
+    private PullCommand createPullCommand(Git git, String remoteName, String username, String password) {
+        PullCommand command = git.pull().setRemote(remoteName);
+        CredentialsProvider cp = createCredentialsProvider(username, password);
+        if (cp != null) {
+            command.setCredentialsProvider(cp);
+        }
+        return command;
+    }
+
+    private boolean hasPullConflicts(PullResult pullResult) {
+        MergeResult mergeResult = pullResult.getMergeResult();
+        return mergeResult != null && !mergeResult.getMergeStatus().isSuccessful();
+    }
+
+    private void discardLocalChanges(Git git) throws GitAPIException {
+        git.reset().setMode(ResetCommand.ResetType.HARD).call();
+        git.clean().setCleanDirectories(false).setForce(true).call();
+    }
+
+    static List<String> extractConflictFiles(String message) {
+        if (message == null || message.isBlank()) {
+            return List.of();
+        }
+        String prefix = "Checkout conflict with files:";
+        if (!message.startsWith(prefix)) {
+            return List.of();
+        }
+        return Arrays.stream(message.substring(prefix.length()).split("\\R"))
+                .map(String::trim)
+                .filter(line -> !line.isEmpty())
+                .toList();
+    }
+
+    public static GitPullConflictException toPullConflictException(Exception exception) {
+        GitPullConflictException conflict = toPullConflictExceptionOrNull(exception);
+        if (conflict != null) {
+            return conflict;
+        }
+        return new GitPullConflictException(List.of());
+    }
+
+    public static GitPullConflictException toPullConflictExceptionOrNull(Exception exception) {
+        if (exception == null) {
+            return null;
+        }
+        List<String> files = extractConflictFiles(exception.getMessage());
+        if (files.isEmpty()) {
+            return null;
+        }
+        return new GitPullConflictException(files);
+    }
+
+    private CredentialsProvider createCredentialsProvider(String username, String password) {
+        boolean hasUsername = username != null && !username.isBlank();
+        boolean hasPassword = password != null && !password.isBlank();
+        if (!hasUsername && !hasPassword) {
+            return null;
+        }
+        return new UsernamePasswordCredentialsProvider(
+                username == null ? "" : username,
+                password == null ? "" : password
+        );
     }
 
     public void addRemote(String name, String url, String repoRelativePath) throws IOException, GitAPIException {
@@ -222,5 +335,18 @@ public class GitService {
             return docsRoot.relativize(normalized).toString().replace('\\', '/');
         }
         return normalized.toString();
+    }
+
+    public static class GitPullConflictException extends RuntimeException {
+        private final List<String> conflictFiles;
+
+        public GitPullConflictException(List<String> conflictFiles) {
+            super("拉取更新前检测到本地冲突文件");
+            this.conflictFiles = List.copyOf(conflictFiles);
+        }
+
+        public List<String> getConflictFiles() {
+            return conflictFiles;
+        }
     }
 }

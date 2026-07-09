@@ -1,5 +1,7 @@
 package com.blog.myblog.service;
 
+import com.blog.myblog.datasource.ReadDb;
+import com.blog.myblog.datasource.WriteDb;
 import com.blog.myblog.entity.ViewRecord;
 import com.blog.myblog.repository.ArticleRepository;
 import com.blog.myblog.repository.ViewRecordRepository;
@@ -14,6 +16,7 @@ import java.util.Map;
 import java.util.UUID;
 
 @Service
+@ReadDb
 @RequiredArgsConstructor
 public class ViewService {
 
@@ -21,6 +24,7 @@ public class ViewService {
     private final ArticleRepository articleRepository;
 
     @Transactional
+    @WriteDb
     public void recordView(Long articleId) {
         articleRepository.findById(articleId).ifPresent(a -> {
             ViewRecord viewRecord = new ViewRecord();

@@ -4,11 +4,6 @@ server:
     context-path: /api
 
 spring:
-  datasource:
-    url: jdbc:mysql://localhost:3306/blog_db?useSSL=false&serverTimezone=UTC
-    username: root
-    password: mysql123
-    driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
     hibernate:
       ddl-auto: update
@@ -27,6 +22,17 @@ spring:
       max-request-size: 50MB
 
 app:
+  datasource:
+    master:
+      url: jdbc:mysql://localhost:3306/blog_db?useSSL=false&serverTimezone=UTC
+      username: root
+      password: mysql123
+      driver-class-name: com.mysql.cj.jdbc.Driver
+    replica:
+      url: jdbc:mysql://localhost:3306/blog_db?useSSL=false&serverTimezone=UTC
+      username: root
+      password: mysql123
+      driver-class-name: com.mysql.cj.jdbc.Driver
   jwt:
     secret: myblog-secret-key-please-change-this-in-production
     expiration: 604800000

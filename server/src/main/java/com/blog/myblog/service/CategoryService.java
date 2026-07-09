@@ -1,5 +1,7 @@
 package com.blog.myblog.service;
 
+import com.blog.myblog.datasource.ReadDb;
+import com.blog.myblog.datasource.WriteDb;
 import com.blog.myblog.dto.CategoryDto;
 import com.blog.myblog.entity.Category;
 import com.blog.myblog.entity.Article;
@@ -26,6 +28,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 
 @Service
+@ReadDb
 @RequiredArgsConstructor
 public class CategoryService {
 
@@ -128,6 +131,7 @@ public class CategoryService {
     }
 
     @Transactional
+    @WriteDb
     public CategoryDto create(CategoryDto dto) {
         Category cat = new Category();
         cat.setName(dto.getName());
@@ -140,6 +144,7 @@ public class CategoryService {
     }
 
     @Transactional
+    @WriteDb
     public CategoryDto update(Long id, CategoryDto dto) {
         Category cat = categoryRepository.findById(id).orElseThrow();
         if (dto.getName() != null) cat.setName(dto.getName());
@@ -149,6 +154,7 @@ public class CategoryService {
     }
 
     @Transactional
+    @WriteDb
     public void delete(Long id) {
         Category category = categoryRepository.findById(id).orElseThrow();
         List<Category> allCategories = categoryRepository.findAll();
@@ -274,6 +280,7 @@ public class CategoryService {
     }
 
     @Transactional
+    @WriteDb
     public void move(Long id, Long newParentId) {
         Category cat = categoryRepository.findById(id).orElseThrow();
         if (newParentId != null) {

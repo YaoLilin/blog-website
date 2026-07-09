@@ -1,5 +1,6 @@
 package com.blog.myblog.service;
 
+import com.blog.myblog.datasource.ReadDb;
 import com.blog.myblog.dto.ArticleDto;
 import com.blog.myblog.dto.CategoryDto;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +19,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Service
+@ReadDb
 @RequiredArgsConstructor
 public class SeoHtmlService {
 

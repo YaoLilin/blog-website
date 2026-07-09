@@ -7,6 +7,7 @@ import { Input } from '../../components/ui/input'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../../components/ui/dialog'
 import { toast } from 'sonner'
 import { formatDate } from '../../lib/utils'
+import { dedupeArticles } from '../../lib/articles'
 import { ArticleEditor } from './ArticleEditor'
 import { CATEGORY_ICON_OPTIONS, getCategoryCoverKind } from '../../components/CategoryCover'
 
@@ -57,15 +58,15 @@ export function ArticleManagement() {
     const walk = (items: Category[]): number[] => {
       for (const cat of items) {
         if (cat.id === targetId) {
-          const ids: number[] = [cat.id]
+          const ids = new Set<number>([cat.id])
           const collectChildren = (node: Category) => {
             node.children?.forEach(child => {
-              ids.push(child.id)
+              ids.add(child.id)
               collectChildren(child)
             })
           }
           collectChildren(cat)
-          return ids
+          return [...ids]
         }
         if (cat.children?.length) {
           const found = walk(cat.children)
@@ -89,8 +90,9 @@ export function ArticleManagement() {
       const ids = collectCategoryIds(categories, catId)
       const results = await Promise.all(ids.map(id => api.getArticles({ categoryId: id, size: 100 })))
       const merged = results.flatMap(r => r.content || [])
-      merged.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      setArticles(merged)
+      const deduped = dedupeArticles(merged)
+      deduped.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      setArticles(deduped)
     } catch {
       setArticles([])
     } finally {

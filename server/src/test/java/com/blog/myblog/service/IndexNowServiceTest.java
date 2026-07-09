@@ -12,6 +12,7 @@ import java.nio.file.Path;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class IndexNowServiceTest {
@@ -33,6 +34,16 @@ class IndexNowServiceTest {
         Path keyFile = tempDir.resolve("abc123.txt");
         assertTrue(Files.exists(keyFile));
         assertEquals("abc123", Files.readString(keyFile));
+    }
+
+    @Test
+    void submitArticleDoesNothingWhenBaseUrlMissing() {
+        IndexNowService service = new IndexNowService(emptyArticleRepository(), new ObjectMapper());
+        ReflectionTestUtils.setField(service, "enabled", true);
+        ReflectionTestUtils.setField(service, "key", "abc123");
+        ReflectionTestUtils.setField(service, "siteBaseUrl", "");
+
+        assertDoesNotThrow(() -> service.submitArticle(136L));
     }
 
     private static ArticleRepository emptyArticleRepository() {

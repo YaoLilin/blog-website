@@ -1,5 +1,7 @@
 package com.blog.myblog.controller;
 
+import com.blog.myblog.datasource.ReadDb;
+import com.blog.myblog.datasource.WriteDb;
 import com.blog.myblog.service.SystemSettingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -9,6 +11,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/settings")
+@ReadDb
 @RequiredArgsConstructor
 public class SettingsController {
 
@@ -20,6 +23,7 @@ public class SettingsController {
     }
 
     @PutMapping("/motto")
+    @WriteDb
     public ResponseEntity<Void> updateMotto(@RequestBody Map<String, String> body) {
         systemSettingService.set("MOTTO", body.getOrDefault("motto", ""));
         return ResponseEntity.ok().build();
@@ -31,6 +35,7 @@ public class SettingsController {
     }
 
     @PutMapping("/{key}")
+    @WriteDb
     public ResponseEntity<Void> update(@PathVariable String key, @RequestBody Map<String, String> body) {
         systemSettingService.set(key, body.getOrDefault("value", ""));
         return ResponseEntity.ok().build();
@@ -46,6 +51,7 @@ public class SettingsController {
     }
 
     @PutMapping("/profile")
+    @WriteDb
     public ResponseEntity<Void> updateProfile(@RequestBody Map<String, String> body) {
         if (body.containsKey("image")) {
             systemSettingService.set("PROFILE_IMAGE", body.get("image"));

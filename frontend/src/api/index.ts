@@ -35,13 +35,17 @@ async function request<T>(endpoint: string, options?: ApiRequestOptions): Promis
       throw new Error('登录已过期')
     }
     let message = text || `HTTP ${resp.status}`
+    let parsedBody: unknown
     try {
       const parsed = JSON.parse(text)
+      parsedBody = parsed
       if (parsed && typeof parsed === 'object' && 'error' in parsed && parsed.error) {
         message = String((parsed as { error: unknown }).error)
       }
     } catch {}
-    throw new Error(message)
+    const error = new Error(message) as Error & { data?: unknown }
+    error.data = parsedBody
+    throw error
   }
   return (text ? JSON.parse(text) : undefined) as T
 }
@@ -146,8 +150,11 @@ export const api = {
     request<void>('/git/commit', { method: 'POST', body: JSON.stringify({ message, categoryId }) }),
   gitPush: (remoteName: string, username: string, password: string, categoryId?: number | null) =>
     request<void>('/git/push', { method: 'POST', body: JSON.stringify({ remoteName, username, password, categoryId }) }),
-  gitPull: (remoteName: string, username: string, password: string, categoryId?: number | null) =>
-    request<{ success: boolean; hasConflicts?: boolean }>('/git/pull', { method: 'POST', body: JSON.stringify({ remoteName, username, password, categoryId }) }),
+  gitPull: (remoteName: string, username: string, password: string, categoryId?: number | null, forceOverwrite = false) =>
+    request<{ success: boolean; hasConflicts?: boolean }>('/git/pull', {
+      method: 'POST',
+      body: JSON.stringify({ remoteName, username, password, categoryId, forceOverwrite }),
+    }),
   cloneRemoteRepo: (url: string, targetCategoryId: number | null, customPath?: string) =>
     request<{ directory: string; repoName: string; relativePath: string }>('/git/clone', {
       method: 'POST',

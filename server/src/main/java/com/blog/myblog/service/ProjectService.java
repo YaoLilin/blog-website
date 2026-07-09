@@ -1,5 +1,7 @@
 package com.blog.myblog.service;
 
+import com.blog.myblog.datasource.ReadDb;
+import com.blog.myblog.datasource.WriteDb;
 import com.blog.myblog.dto.ProjectDto;
 import com.blog.myblog.entity.Project;
 import com.blog.myblog.repository.ProjectRepository;
@@ -11,6 +13,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
+@ReadDb
 @RequiredArgsConstructor
 public class ProjectService {
 
@@ -26,6 +29,7 @@ public class ProjectService {
     }
 
     @Transactional
+    @WriteDb
     public ProjectDto create(ProjectDto dto) {
         Project p = new Project();
         p.setName(dto.getName());
@@ -38,6 +42,7 @@ public class ProjectService {
     }
 
     @Transactional
+    @WriteDb
     public ProjectDto update(Long id, ProjectDto dto) {
         Project p = projectRepository.findById(id).orElseThrow();
         if (dto.getName() != null) p.setName(dto.getName());
@@ -50,6 +55,7 @@ public class ProjectService {
     }
 
     @Transactional
+    @WriteDb
     public void delete(Long id) {
         projectRepository.deleteById(id);
     }

@@ -1,5 +1,6 @@
 package com.blog.myblog.controller;
 
+import com.blog.myblog.datasource.ReadDb;
 import com.blog.myblog.dto.ArticleDto;
 import com.blog.myblog.service.ArticleService;
 import com.blog.myblog.service.SeoHtmlService;
@@ -18,6 +19,7 @@ import java.util.concurrent.TimeUnit;
 
 @RestController
 @RequestMapping("/seo/articles")
+@ReadDb
 @RequiredArgsConstructor
 public class SeoArticleController {
 

@@ -1,5 +1,7 @@
 package com.blog.myblog.controller;
 
+import com.blog.myblog.datasource.ReadDb;
+import com.blog.myblog.datasource.WriteDb;
 import com.blog.myblog.service.GitService;
 import com.blog.myblog.service.CategoryService;
 import com.blog.myblog.dto.CategoryDto;
@@ -12,6 +14,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/git")
+@ReadDb
 @RequiredArgsConstructor
 public class GitController {
 
@@ -52,16 +55,35 @@ public class GitController {
     }
 
     @PostMapping("/pull")
-    public ResponseEntity<Map<String, Object>> pull(@RequestBody Map<String, String> body) {
+    public ResponseEntity<Map<String, Object>> pull(@RequestBody Map<String, Object> body) {
         try {
+            Object forceValue = body.get("forceOverwrite");
+            boolean forceOverwrite = forceValue instanceof Boolean
+                    ? (Boolean) forceValue
+                    : forceValue != null && Boolean.parseBoolean(forceValue.toString());
             Map<String, Object> result = gitService.pull(
-                body.getOrDefault("remoteName", "origin"),
-                body.getOrDefault("username", ""),
-                body.getOrDefault("password", ""),
-                resolveRepoRelativePath(parseCategoryId(body.get(CATEGORY_ID)))
+                stringValue(body.get("remoteName"), "origin"),
+                stringValue(body.get("username"), ""),
+                stringValue(body.get("password"), ""),
+                resolveRepoRelativePath(parseCategoryId(body.get(CATEGORY_ID))),
+                forceOverwrite
             );
             return ResponseEntity.ok(result);
+        } catch (GitService.GitPullConflictException e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    ERROR, errorMessage(e),
+                    "conflictFiles", e.getConflictFiles(),
+                    "canForceOverwrite", true
+            ));
         } catch (Exception e) {
+            GitService.GitPullConflictException conflict = GitService.toPullConflictExceptionOrNull(e);
+            if (conflict != null) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        ERROR, errorMessage(conflict),
+                        "conflictFiles", conflict.getConflictFiles(),
+                        "canForceOverwrite", true
+                ));
+            }
             return ResponseEntity.badRequest().body(Map.of(ERROR, errorMessage(e)));
         }
     }
@@ -97,6 +119,7 @@ public class GitController {
     }
 
     @PostMapping("/clone")
+    @WriteDb
     public ResponseEntity<Map<String, Object>> cloneRepo(@RequestBody Map<String, Object> body) {
         try {
             String url = body.getOrDefault("url", "").toString();
@@ -122,6 +145,12 @@ public class GitController {
     private Long parseCategoryId(Object value) {
         if (value == null || value.toString().isBlank()) return null;
         return Long.valueOf(value.toString());
+    }
+
+    private String stringValue(Object value, String defaultValue) {
+        if (value == null) return defaultValue;
+        String text = value.toString();
+        return text.isBlank() ? defaultValue : text;
     }
 
     private String resolveRepoRelativePath(Long categoryId) {

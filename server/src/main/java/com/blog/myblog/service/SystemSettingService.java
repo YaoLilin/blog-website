@@ -1,5 +1,7 @@
 package com.blog.myblog.service;
 
+import com.blog.myblog.datasource.ReadDb;
+import com.blog.myblog.datasource.WriteDb;
 import com.blog.myblog.entity.SystemSetting;
 import com.blog.myblog.repository.SystemSettingRepository;
 import lombok.RequiredArgsConstructor;
@@ -10,6 +12,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
+@ReadDb
 @RequiredArgsConstructor
 public class SystemSettingService {
 
@@ -22,6 +25,7 @@ public class SystemSettingService {
     }
 
     @Transactional
+    @WriteDb
     public void set(String key, String value) {
         SystemSetting setting = systemSettingRepository.findBySettingKey(key).orElseGet(() -> {
             SystemSetting s = new SystemSetting();

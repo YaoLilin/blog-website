@@ -1,5 +1,6 @@
 package com.blog.myblog.service;
 
+import com.blog.myblog.datasource.WriteDb;
 import com.blog.myblog.entity.Article;
 import com.blog.myblog.entity.Category;
 import com.blog.myblog.repository.ArticleRepository;
@@ -27,8 +28,11 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @Service
+@WriteDb
 @RequiredArgsConstructor
 public class FileWatcherService {
+    private static final String DEBUG_PREFIX = "[DEBUG-gitpull-20260709]";
+    private static final long SLOW_SYNC_THRESHOLD_MS = 1000L;
 
     @Value("${app.docs.path}")
     private String docsPath;
@@ -102,12 +106,17 @@ public class FileWatcherService {
     }
 
     private void handleFileEvent(WatchEvent.Kind<?> kind, Path path) {
+        long startedAt = System.nanoTime();
         File file = path.toFile();
+        String fileName = file.getName();
+        if (shouldIgnorePath(fileName)) {
+            return;
+        }
         if (kind == StandardWatchEventKinds.ENTRY_CREATE || kind == StandardWatchEventKinds.ENTRY_MODIFY) {
             if (file.isDirectory()) {
                 try { registerAll(path); } catch (IOException ignored) {}
                 syncDirectory(file, null);
-            } else if (file.getName().endsWith(".md")) {
+            } else if (fileName.endsWith(".md")) {
                 File parent = file.getParentFile();
                 if (parent != null) {
                     syncDirectory(parent, null);
@@ -116,31 +125,46 @@ public class FileWatcherService {
         } else if (kind == StandardWatchEventKinds.ENTRY_DELETE) {
             log.info("文件已删除: {}", path);
             String absolutePath = file.getAbsolutePath();
-            if (file.getName().endsWith(".md")) {
+            if (fileName.endsWith(".md")) {
                 List<Article> articles = articleRepository.findByFilePathOrderByIdAsc(absolutePath);
                 if (!articles.isEmpty()) {
                     articleRepository.deleteAll(articles);
                     log.info("已同步删除文章: {}（共 {} 条）", articles.get(0).getTitle(), articles.size());
                 }
-            } else {
-                List<Article> orphaned = articleRepository.findByFilePathStartingWith(absolutePath + "/");
-                if (!orphaned.isEmpty()) {
-                    articleRepository.deleteAll(orphaned);
-                    log.info("已同步删除目录下的 {} 篇文章", orphaned.size());
+                File parent = file.getParentFile();
+                if (parent != null) {
+                    syncDirectory(parent, null);
                 }
+            } else {
                 String relativePath = toRelativePath(file);
-                pruneEmptyServerCategories(relativePath);
-                log.info("已同步删除分类及子分类: {}", relativePath);
+                if (hasServerManagedCategory(relativePath)) {
+                    List<Article> orphaned = articleRepository.findByFilePathStartingWith(absolutePath + "/");
+                    if (!orphaned.isEmpty()) {
+                        articleRepository.deleteAll(orphaned);
+                        log.info("已同步删除目录下的 {} 篇文章", orphaned.size());
+                    }
+                    pruneEmptyServerCategories(relativePath);
+                    log.info("已同步删除分类及子分类: {}", relativePath);
+
+                    File parent = file.getParentFile();
+                    if (parent != null) {
+                        syncDirectory(parent, null);
+                    }
+                }
             }
-            File parent = file.getParentFile();
-            if (parent != null) {
-                syncDirectory(parent, null);
-            }
+        }
+        long elapsedMs = elapsedMillis(startedAt);
+        if (elapsedMs >= SLOW_SYNC_THRESHOLD_MS) {
+            log.info("{} watcher event kind={} path={} finished in {} ms",
+                    DEBUG_PREFIX, kind.name(), path, elapsedMs);
         }
     }
 
     public void rescan() {
+        long startedAt = System.nanoTime();
+        log.info("{} watcher rescan start docsPath={}", DEBUG_PREFIX, docsPath);
         syncDirectory(new File(docsPath), null);
+        log.info("{} watcher rescan finished in {} ms", DEBUG_PREFIX, elapsedMillis(startedAt));
     }
 
     public void fullSync() {
@@ -190,12 +214,18 @@ public class FileWatcherService {
         if (!dir.exists() || !dir.isDirectory()) return;
         String dirName = dir.getName();
         if (dirName.startsWith(".")) return;
+        long startedAt = System.nanoTime();
 
         Long catId = parentCategoryId;
         if (!dir.getAbsolutePath().equals(docsPath)) {
             String relativePath = toRelativePath(dir);
             if (!containsMarkdown(dir)) {
                 pruneEmptyServerCategories(relativePath);
+                long elapsedMs = elapsedMillis(startedAt);
+                if (elapsedMs >= SLOW_SYNC_THRESHOLD_MS) {
+                    log.info("{} watcher syncDirectory pruned empty dir={} parentCategoryId={} in {} ms",
+                            DEBUG_PREFIX, dir.getAbsolutePath(), parentCategoryId, elapsedMs);
+                }
                 return;
             }
             Category cat = categoryRepository.findByFilePathAndIsServerManagedTrueOrderByIdAsc(relativePath)
@@ -214,12 +244,24 @@ public class FileWatcherService {
         if (files == null) return;
         final Long finalCatId = catId;
         for (File f : files) {
-            if (f.isDirectory() && !f.getName().startsWith(".")) {
+            if (shouldIgnorePath(f.getName())) {
+                continue;
+            }
+            if (f.isDirectory()) {
                 syncDirectory(f, finalCatId);
             } else if (f.isFile() && f.getName().endsWith(".md")) {
                 syncFileWithCategory(f, finalCatId);
             }
         }
+        long elapsedMs = elapsedMillis(startedAt);
+        if (elapsedMs >= SLOW_SYNC_THRESHOLD_MS) {
+            log.info("{} watcher syncDirectory dir={} parentCategoryId={} in {} ms",
+                    DEBUG_PREFIX, dir.getAbsolutePath(), parentCategoryId, elapsedMs);
+        }
+    }
+
+    private long elapsedMillis(long startedAt) {
+        return (System.nanoTime() - startedAt) / 1_000_000;
     }
 
     private boolean containsMarkdown(File dir) {
@@ -235,13 +277,42 @@ public class FileWatcherService {
 
     private void pruneEmptyServerCategories(String relativePath) {
         String prefix = relativePath + "/";
-        categoryRepository.findAll().stream()
+        List<Category> categoriesToDelete = categoryRepository.findAll().stream()
                 .filter(c -> Boolean.TRUE.equals(c.getIsServerManaged()))
                 .filter(c -> relativePath.equals(c.getFilePath()) || (c.getFilePath() != null && c.getFilePath().startsWith(prefix)))
                 .sorted((a, b) -> Integer.compare(
                         b.getFilePath() == null ? 0 : b.getFilePath().length(),
                         a.getFilePath() == null ? 0 : a.getFilePath().length()))
-                .forEach(categoryRepository::delete);
+                .toList();
+        if (categoriesToDelete.isEmpty()) {
+            return;
+        }
+
+        List<Long> categoryIds = categoriesToDelete.stream()
+                .map(Category::getId)
+                .filter(Objects::nonNull)
+                .toList();
+        if (!categoryIds.isEmpty()) {
+            List<Article> linkedArticles = articleRepository.findAll().stream()
+                    .filter(article -> Boolean.TRUE.equals(article.getIsServerManaged()))
+                    .filter(article -> article.getCategoryId() != null && categoryIds.contains(article.getCategoryId()))
+                    .toList();
+            if (!linkedArticles.isEmpty()) {
+                articleRepository.deleteAll(linkedArticles);
+            }
+        }
+
+        categoriesToDelete.forEach(categoryRepository::delete);
+    }
+
+    private boolean hasServerManagedCategory(String relativePath) {
+        if (relativePath == null || relativePath.isBlank()) {
+            return false;
+        }
+        return categoryRepository.findByFilePathAndIsServerManagedTrueOrderByIdAsc(relativePath)
+                .stream()
+                .findFirst()
+                .isPresent();
     }
 
     private Category createServerCategory(String name, String relativePath, Long parentCategoryId) {
@@ -338,12 +409,23 @@ public class FileWatcherService {
     }
 
     private java.util.Optional<Article> resolveCanonicalArticle(String path) {
-        List<Article> articles = articleRepository.findByFilePathOrderByIdAsc(path);
+        String canonicalKey = canonicalServerManagedPathKey(path);
+        List<Article> articles = articleRepository.findAll().stream()
+                .filter(article -> Boolean.TRUE.equals(article.getIsServerManaged()))
+                .filter(article -> canonicalServerManagedPathKey(article.getFilePath()).equals(canonicalKey))
+                .sorted((left, right) -> Long.compare(
+                        left.getId() == null ? Long.MAX_VALUE : left.getId(),
+                        right.getId() == null ? Long.MAX_VALUE : right.getId()))
+                .toList();
         if (articles.isEmpty()) {
             return java.util.Optional.empty();
         }
 
         Article primary = articles.get(0);
+        if (!path.equals(primary.getFilePath())) {
+            primary.setFilePath(path);
+            articleRepository.save(primary);
+        }
         if (articles.size() > 1) {
             List<Article> duplicates = new ArrayList<>(articles.subList(1, articles.size()));
             articleRepository.deleteAll(duplicates);
@@ -356,21 +438,58 @@ public class FileWatcherService {
         Map<String, List<Article>> duplicatesByPath = articleRepository.findAll().stream()
                 .filter(article -> Boolean.TRUE.equals(article.getIsServerManaged()))
                 .filter(article -> article.getFilePath() != null && !article.getFilePath().isBlank())
-                .collect(Collectors.groupingBy(Article::getFilePath));
+                .collect(Collectors.groupingBy(article -> canonicalServerManagedPathKey(article.getFilePath())));
 
-        List<Article> duplicates = duplicatesByPath.values().stream()
+        List<Article> duplicates = new ArrayList<>();
+        duplicatesByPath.values().stream()
                 .filter(articles -> articles.size() > 1)
-                .flatMap(articles -> articles.stream()
+                .forEach(articles -> {
+                    List<Article> sorted = articles.stream()
                         .sorted((left, right) -> Long.compare(
                                 left.getId() == null ? Long.MAX_VALUE : left.getId(),
                                 right.getId() == null ? Long.MAX_VALUE : right.getId()))
-                        .skip(1))
-                .toList();
+                        .toList();
+                    Article primary = sorted.get(0);
+                    String canonicalPath = canonicalAbsolutePath(primary.getFilePath());
+                    if (canonicalPath != null && !canonicalPath.equals(primary.getFilePath())) {
+                        primary.setFilePath(canonicalPath);
+                        articleRepository.save(primary);
+                    }
+                    duplicates.addAll(sorted.subList(1, sorted.size()));
+                });
 
         if (!duplicates.isEmpty()) {
             articleRepository.deleteAll(duplicates);
             log.warn("全量同步时清理了 {} 条重复的服务器管理文章路径记录", duplicates.size());
         }
+    }
+
+    private String canonicalServerManagedPathKey(String filePath) {
+        if (filePath == null || filePath.isBlank()) {
+            return "";
+        }
+        String normalized = filePath.replace('\\', '/');
+        Path docsRoot = Path.of(docsPath).toAbsolutePath().normalize();
+        try {
+            Path articlePath = Path.of(filePath).toAbsolutePath().normalize();
+            if (articlePath.startsWith(docsRoot)) {
+                return docsRoot.relativize(articlePath).toString().replace('\\', '/');
+            }
+        } catch (Exception ignored) {
+        }
+        int docsIndex = normalized.indexOf("/docs/");
+        if (docsIndex >= 0) {
+            return normalized.substring(docsIndex + "/docs/".length());
+        }
+        return normalized;
+    }
+
+    private String canonicalAbsolutePath(String filePath) {
+        String relative = canonicalServerManagedPathKey(filePath);
+        if (relative.isBlank()) {
+            return null;
+        }
+        return Path.of(docsPath).resolve(relative).normalize().toString();
     }
 
     private String extractTitle(String filename, String content) {
@@ -379,5 +498,12 @@ public class FileWatcherService {
             if (line.startsWith("# ")) return line.substring(2).trim();
         }
         return filename.replace(".md", "");
+    }
+
+    private boolean shouldIgnorePath(String fileName) {
+        return fileName == null
+                || fileName.isBlank()
+                || fileName.startsWith(".")
+                || fileName.startsWith("._");
     }
 }

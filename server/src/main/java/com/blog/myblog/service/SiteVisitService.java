@@ -1,5 +1,7 @@
 package com.blog.myblog.service;
 
+import com.blog.myblog.datasource.ReadDb;
+import com.blog.myblog.datasource.WriteDb;
 import com.blog.myblog.entity.SiteVisitRecord;
 import com.blog.myblog.repository.SiteVisitRecordRepository;
 import lombok.RequiredArgsConstructor;
@@ -12,12 +14,14 @@ import java.util.List;
 import java.util.Map;
 
 @Service
+@ReadDb
 @RequiredArgsConstructor
 public class SiteVisitService {
 
     private final SiteVisitRecordRepository siteVisitRecordRepository;
 
     @Transactional
+    @WriteDb
     public void recordVisit() {
         SiteVisitRecord record = new SiteVisitRecord();
         siteVisitRecordRepository.save(record);

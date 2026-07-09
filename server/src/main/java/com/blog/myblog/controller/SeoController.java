@@ -1,5 +1,6 @@
 package com.blog.myblog.controller;
 
+import com.blog.myblog.datasource.ReadDb;
 import com.blog.myblog.entity.Article;
 import com.blog.myblog.entity.Category;
 import com.blog.myblog.repository.ArticleRepository;
@@ -17,6 +18,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.concurrent.TimeUnit;
 
 @RestController
+@ReadDb
 @RequiredArgsConstructor
 public class SeoController {
 

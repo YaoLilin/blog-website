@@ -100,16 +100,23 @@ server:
     context-path: /api
 
 spring:
-  datasource:
-    url: jdbc:mysql://localhost:3306/blog_db
-    username: your_mysql_username
-    password: your_mysql_password
   data:
     redis:
       host: localhost
       port: 6379
 
 app:
+  datasource:
+    master:
+      url: jdbc:mysql://localhost:3306/blog_db?useSSL=false&serverTimezone=UTC
+      username: your_mysql_username
+      password: your_mysql_password
+      driver-class-name: com.mysql.cj.jdbc.Driver
+    replica:
+      url: jdbc:mysql://localhost:3306/blog_db?useSSL=false&serverTimezone=UTC
+      username: your_mysql_username
+      password: your_mysql_password
+      driver-class-name: com.mysql.cj.jdbc.Driver
   jwt:
     secret: your-secret-key-here
   admin:
@@ -131,6 +138,12 @@ app:
     dist:
       path: /path/to/frontend/dist
 ```
+
+数据源说明：
+
+- `app.datasource.master`：写库，适合指向主数据库
+- `app.datasource.replica`：读库，适合指向当前节点本地只读副本
+- 如果当前环境不做主从分离，可以先把 `master` 和 `replica` 都配置成同一个数据库地址
 
 这里保存的是管理员密码的 BCrypt 哈希值，不是明文密码。修改时请先用 `BCryptPasswordEncoder` 重新生成哈希，再替换这里的值。
 
@@ -275,6 +288,17 @@ server:
     context-path: /api
 
 app:
+  datasource:
+    master:
+      url: jdbc:mysql://127.0.0.1:3306/blog_db?useSSL=false&serverTimezone=UTC
+      username: root
+      password: your-master-password
+      driver-class-name: com.mysql.cj.jdbc.Driver
+    replica:
+      url: jdbc:mysql://127.0.0.1:3306/blog_db?useSSL=false&serverTimezone=UTC
+      username: root
+      password: your-replica-password
+      driver-class-name: com.mysql.cj.jdbc.Driver
   docs:
     path: /opt/myblog/docs
   image:
@@ -292,6 +316,13 @@ app:
     enabled: true
     key: your-indexnow-key
 ```
+
+如果部署的是单机版博客，没有单独的从库，可以让 `app.datasource.master` 和 `app.datasource.replica` 指向同一个数据库。
+
+如果部署的是“国内主库 + 国外从库”：
+
+- 国内节点：`master`、`replica` 都可以指向国内数据库，或后续再拆分
+- 国外节点：`master` 指向国内主库，`replica` 指向国外本地 MariaDB 从库
 
 #### 1. 构建前端
 

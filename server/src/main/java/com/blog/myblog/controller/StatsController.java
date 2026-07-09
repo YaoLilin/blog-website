@@ -1,5 +1,7 @@
 package com.blog.myblog.controller;
 
+import com.blog.myblog.datasource.ReadDb;
+import com.blog.myblog.datasource.WriteDb;
 import com.blog.myblog.repository.ArticleRepository;
 import com.blog.myblog.service.ArticleService;
 import com.blog.myblog.service.SiteVisitService;
@@ -21,6 +23,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/stats")
+@ReadDb
 @RequiredArgsConstructor
 public class StatsController {
 
@@ -69,6 +72,7 @@ public class StatsController {
     }
 
     @PostMapping("/visit")
+    @WriteDb
     public ResponseEntity<Void> recordVisit(HttpServletRequest request) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth != null && auth.isAuthenticated() && !(auth instanceof AnonymousAuthenticationToken)) {
