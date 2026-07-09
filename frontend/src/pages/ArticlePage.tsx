@@ -12,6 +12,7 @@ import { useAuthStore } from '../stores/authStore'
 import { formatDate } from '../lib/utils'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
+import { FeedbackDialog, type FeedbackDialogState } from '../components/feedback-dialog'
 import { VditorEditor } from '../components/VditorEditor'
 import { SITE_CONFIG } from '../config/site'
 
@@ -125,6 +126,7 @@ export function ArticlePage() {
   const [tocOpen, setTocOpen] = useState(true)
   const [editTitle, setEditTitle] = useState('')
   const [gitRemoteUrl, setGitRemoteUrl] = useState('')
+  const [feedback, setFeedback] = useState<FeedbackDialogState | null>(null)
   const contentRef = useRef<HTMLDivElement>(null)
   const articleHeaderRef = useRef<HTMLDivElement>(null)
   // 点击目录后的"静默期"，期间忽略 IntersectionObserver 的高亮更新
@@ -264,7 +266,11 @@ export function ArticlePage() {
   const handleSave = async () => {
     if (!article) return
     if (!editTitle.trim()) {
-      alert('请输入标题')
+      setFeedback({
+        title: '无法保存文章',
+        message: '请输入标题',
+        variant: 'error',
+      })
       return
     }
     setSaving(true)
@@ -284,8 +290,12 @@ export function ArticlePage() {
       const allToc = extractToc(stripMarkdownComments(editContent))
       setAllTocItems(allToc)
       setToc(allToc.filter(t => t.level <= 3))
-    } catch {
-      alert('保存失败')
+    } catch (err) {
+      setFeedback({
+        title: '保存失败',
+        message: err instanceof Error ? err.message : '保存失败',
+        variant: 'error',
+      })
     } finally {
       setSaving(false)
     }
@@ -602,6 +612,14 @@ export function ArticlePage() {
 
 
       </aside>
+
+      <FeedbackDialog
+        open={feedback !== null}
+        feedback={feedback}
+        onOpenChange={open => {
+          if (!open) setFeedback(null)
+        }}
+      />
     </div>
     </>
   )

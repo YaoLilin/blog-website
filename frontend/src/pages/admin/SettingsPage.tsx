@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../../api'
+import { FeedbackDialog, type FeedbackDialogState } from '../../components/feedback-dialog'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import type { Category } from '../../types'
@@ -20,6 +21,7 @@ export function SettingsPage() {
   const [articleSearchLoading, setArticleSearchLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [savedMsg, setSavedMsg] = useState('')
+  const [feedback, setFeedback] = useState<FeedbackDialogState | null>(null)
 
   useEffect(() => {
     api.getSettings().then(async s => {
@@ -102,8 +104,12 @@ export function SettingsPage() {
       ])
       setSavedMsg('保存成功')
       setTimeout(() => setSavedMsg(''), 2000)
-    } catch {
-      alert('保存失败')
+    } catch (err) {
+      setFeedback({
+        title: '保存失败',
+        message: err instanceof Error ? err.message : '保存失败',
+        variant: 'error',
+      })
     } finally {
       setSaving(false)
     }
@@ -262,6 +268,14 @@ export function SettingsPage() {
           {savedMsg && <span className="text-sm text-green-600">{savedMsg}</span>}
         </div>
       </div>
+
+      <FeedbackDialog
+        open={feedback !== null}
+        feedback={feedback}
+        onOpenChange={open => {
+          if (!open) setFeedback(null)
+        }}
+      />
     </div>
   )
 }

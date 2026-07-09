@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Save } from 'lucide-react'
 import { api } from '../../api'
 import type { Article } from '../../types'
+import { FeedbackDialog, type FeedbackDialogState } from '../../components/feedback-dialog'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { VditorEditor } from '../../components/VditorEditor'
@@ -16,6 +17,7 @@ export function ArticleEditor({ article, categoryId, onSave }: Props) {
   const [title, setTitle] = useState(article?.title || '')
   const [content, setContent] = useState(article?.content || '')
   const [saving, setSaving] = useState(false)
+  const [feedback, setFeedback] = useState<FeedbackDialogState | null>(null)
 
   useEffect(() => {
     setTitle(article?.title || '')
@@ -23,7 +25,14 @@ export function ArticleEditor({ article, categoryId, onSave }: Props) {
   }, [article])
 
   const handleSave = async () => {
-    if (!title.trim()) { alert('请输入标题'); return }
+    if (!title.trim()) {
+      setFeedback({
+        title: '无法保存文章',
+        message: '请输入标题',
+        variant: 'error',
+      })
+      return
+    }
     setSaving(true)
     try {
       let saved: Article
@@ -40,8 +49,12 @@ export function ArticleEditor({ article, categoryId, onSave }: Props) {
         saved = await api.createArticle({ title, content, categoryId })
       }
       onSave(saved)
-    } catch {
-      alert('保存失败')
+    } catch (err) {
+      setFeedback({
+        title: '保存失败',
+        message: err instanceof Error ? err.message : '保存失败',
+        variant: 'error',
+      })
     } finally {
       setSaving(false)
     }
@@ -68,6 +81,14 @@ export function ArticleEditor({ article, categoryId, onSave }: Props) {
           className="h-full"
         />
       </div>
+
+      <FeedbackDialog
+        open={feedback !== null}
+        feedback={feedback}
+        onOpenChange={open => {
+          if (!open) setFeedback(null)
+        }}
+      />
     </div>
   )
 }

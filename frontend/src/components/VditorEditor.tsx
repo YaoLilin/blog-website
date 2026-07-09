@@ -1,8 +1,9 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Vditor from 'vditor'
 import 'vditor/dist/index.css'
 import 'vditor/dist/js/i18n/zh_CN'
 import { api } from '../api'
+import { FeedbackDialog, type FeedbackDialogState } from './feedback-dialog'
 import { useTheme } from '../theme-provider'
 
 type EditorTheme = 'classic' | 'dark'
@@ -37,6 +38,7 @@ export function VditorEditor({
   const onChangeRef = useRef(onChange)
   const initialValueRef = useRef(value)
   const vditorI18n = (window as typeof window & { VditorI18n?: Record<string, string> }).VditorI18n
+  const [feedback, setFeedback] = useState<FeedbackDialogState | null>(null)
 
   const vditorTheme: EditorTheme = theme === 'dark' ? 'dark' : 'classic'
 
@@ -82,8 +84,12 @@ export function VditorEditor({
             try {
               const result = await api.uploadFile(file, articleId)
               editorRef.current?.insertMD(getUploadMarkdown(file, result.url))
-            } catch {
-              alert(`${file.name} 上传失败`)
+            } catch (err) {
+              setFeedback({
+                title: '上传失败',
+                message: err instanceof Error ? `${file.name} 上传失败：${err.message}` : `${file.name} 上传失败`,
+                variant: 'error',
+              })
             }
           }
           return null
@@ -106,5 +112,16 @@ export function VditorEditor({
     }
   }, [articleId, minHeight, placeholder, vditorTheme])
 
-  return <div ref={containerRef} className={className} />
+  return (
+    <>
+      <div ref={containerRef} className={className} />
+      <FeedbackDialog
+        open={feedback !== null}
+        feedback={feedback}
+        onOpenChange={open => {
+          if (!open) setFeedback(null)
+        }}
+      />
+    </>
+  )
 }
