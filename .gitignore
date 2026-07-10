@@ -41,6 +41,7 @@ CLAUDE.md
 server/server/static
 server/static
 server/target
+server/docs
 
 # 敏感信息
 docs/server-config.md
