@@ -42,6 +42,7 @@ server/server/static
 server/static
 server/target
 server/docs
+scripts
 
 # 敏感信息
 docs/server-config.md
