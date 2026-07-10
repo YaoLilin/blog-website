@@ -23,6 +23,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.Duration;
+import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -70,6 +71,17 @@ public class IndexNowService {
             return;
         }
         submitUrls(List.of(buildArticleUrl(articleId)));
+    }
+
+    public void submitArticles(Collection<Long> articleIds) {
+        if (articleIds == null || articleIds.isEmpty() || !isConfigured()) {
+            return;
+        }
+        List<String> urls = articleIds.stream()
+                .filter(id -> id != null)
+                .map(this::buildArticleUrl)
+                .toList();
+        submitUrls(urls);
     }
 
     public void submitAllArticles() {

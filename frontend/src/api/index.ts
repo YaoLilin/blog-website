@@ -22,27 +22,59 @@ function handleAuthExpired() {
   window.location.href = '/admin/login'
 }
 
+function isHtmlResponse(text: string, contentType: string | null) {
+  if (contentType?.toLowerCase().includes('text/html')) {
+    return true
+  }
+  const normalized = text.trim().toLowerCase()
+  return normalized.startsWith('<!doctype html') || normalized.startsWith('<html')
+}
+
+function normalizeErrorMessage(resp: Response, text: string, parsedBody?: unknown) {
+  if (parsedBody && typeof parsedBody === 'object' && 'error' in parsedBody && parsedBody.error) {
+    return String((parsedBody as { error: unknown }).error)
+  }
+
+  if (resp.status === 408 || resp.status === 504) {
+    return '请求超时，请稍后重试'
+  }
+
+  if (isHtmlResponse(text, resp.headers.get('content-type'))) {
+    const lowered = text.toLowerCase()
+    if (lowered.includes('gateway time-out') || lowered.includes('gateway timeout') || lowered.includes('time-out')) {
+      return '请求超时，请稍后重试'
+    }
+    return `请求失败（HTTP ${resp.status}）`
+  }
+
+  return text || `HTTP ${resp.status}`
+}
+
 async function request<T>(endpoint: string, options?: ApiRequestOptions): Promise<T> {
   const { redirectOnUnauthorized = true, ...fetchOptions } = options || {}
-  const resp = await fetch(`${BASE_URL}${endpoint}`, {
-    ...fetchOptions,
-    headers: { ...getHeaders(), ...(fetchOptions.headers || {}) },
-  })
+  let resp: Response
+  try {
+    resp = await fetch(`${BASE_URL}${endpoint}`, {
+      ...fetchOptions,
+      headers: { ...getHeaders(), ...(fetchOptions.headers || {}) },
+    })
+  } catch (err) {
+    const message = err instanceof Error && err.name === 'AbortError'
+      ? '请求超时，请稍后重试'
+      : '网络请求失败，请稍后重试'
+    throw new Error(message)
+  }
   const text = await resp.text()
   if (!resp.ok) {
     if (resp.status === 401 && redirectOnUnauthorized) {
       handleAuthExpired()
       throw new Error('登录已过期')
     }
-    let message = text || `HTTP ${resp.status}`
     let parsedBody: unknown
     try {
-      const parsed = JSON.parse(text)
-      parsedBody = parsed
-      if (parsed && typeof parsed === 'object' && 'error' in parsed && parsed.error) {
-        message = String((parsed as { error: unknown }).error)
-      }
+      parsedBody = JSON.parse(text)
     } catch {}
+    const message = normalizeErrorMessage(resp, text, parsedBody)
     const error = new Error(message) as Error & { data?: unknown }
     error.data = parsedBody
     throw error
@@ -135,9 +167,18 @@ export const api = {
           handleAuthExpired()
           throw new Error('登录已过期')
         }
-        throw new Error(text || `HTTP ${r.status}`)
+        let parsedBody: unknown
+        try {
+          parsedBody = JSON.parse(text)
+        } catch {}
+        throw new Error(normalizeErrorMessage(r, text, parsedBody))
       }
       return (text ? JSON.parse(text) : undefined) as { url: string; originalName: string }
+    }).catch(err => {
+      if (err instanceof Error) {
+        throw err
+      }
+      throw new Error('网络请求失败，请稍后重试')
     })
   },
 

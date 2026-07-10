@@ -15,6 +15,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GitServiceConflictTest {
 
+    private static final IndexNowService NO_OP_INDEX_NOW = new IndexNowService(null, null) {
+        @Override
+        public void submitArticles(java.util.Collection<Long> articleIds) {
+        }
+    };
+
     @TempDir
     private Path tempDir;
 
@@ -59,7 +65,7 @@ class GitServiceConflictTest {
         Files.createDirectories(docsDir);
 
         try (Git ignored = Git.init().setDirectory(projectRoot.toFile()).call()) {
-            GitService service = new GitService(null);
+            GitService service = new GitService(null, NO_OP_INDEX_NOW);
             ReflectionTestUtils.setField(service, "docsPath", docsDir.toString());
 
             Object hasRepo = service.getStatus(null).get("hasRepo");

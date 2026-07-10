@@ -141,6 +141,12 @@
 | `app.image.storage.path` | 图片存储目录 |
 | `app.attachment.storage.path` | 附件存储目录 |
 | `app.frontend.dist.path` | 前端构建目录 |
+| `app.site.base-url` | 站点对外公开访问地址，用于 sitemap、canonical、IndexNow |
+| `app.site.name` | 站点名称，用于 SEO 标题 |
+| `app.site.author` | 站点作者，用于结构化数据 |
+| `app.index-now.enabled` | 是否启用 IndexNow |
+| `app.index-now.key` | IndexNow key |
+| `app.index-now.endpoint` | IndexNow 提交地址，默认 Bing |
 
 ### 3.4 安全模型
 
@@ -510,6 +516,91 @@ SEO 由后端和 Nginx 配合：
 - `/api/seo/articles/view?path=...` 按文件路径输出 HTML。
 - Nginx 可将 `/robots.txt`、`/sitemap.xml` 和 `/articles/**` 代理到后端 SEO 接口。
 - 前端页面使用 `react-helmet-async` 设置标题和描述。
+
+### 7.1 搜索引擎发现文章的机制
+
+搜索引擎发现本站文章，不是依赖某一个单点功能，而是依赖下面几条链路共同工作：
+
+- 可抓取的公开文章 URL：文章对外主地址是 `/articles/{id}`，服务器管理文章如果是按文档路径访问，SEO 输出仍会尽量回到 `/articles/{id}` 作为 canonical。
+- `robots.txt`：后端 `SeoController` 动态生成 `robots.txt`，允许抓取公开页面，并显式声明 `Sitemap: <base-url>/sitemap.xml`。
+- `sitemap.xml`：后端 `SeoController` 会把首页、分类页、最近文章页、分类详情页、文章详情页输出到 sitemap 中。文章节点会带 `lastmod`，便于搜索引擎判断是否需要重新抓取。
+- 服务端 SEO HTML：`SeoArticleController` + `SeoHtmlService` 会输出可直接抓取的文章 HTML，而不是只依赖前端 SPA 运行后再渲染。输出内容包含：
+  - `<title>` 和 `<meta name="description">`
+  - `<link rel="canonical">`
+  - Open Graph 元信息
+  - `application/ld+json` 的 `BlogPosting` 结构化数据
+- IndexNow：启用后，后端会在文章新增、编辑、删除时主动把文章 URL 提交给支持 IndexNow 的搜索引擎，缩短“被发现”和“重新收录”的时间。
+
+### 7.2 SEO 具体实现
+
+- `SeoController`
+  - `GET /robots.txt`
+  - `GET /sitemap.xml`
+  - `robots.txt` 和 `sitemap.xml` 中的域名优先从反向代理头 `X-Forwarded-Proto` / `X-Forwarded-Host` 推导。
+- `SeoArticleController`
+  - `GET /seo/articles/{id}`
+  - `GET /seo/articles/view?path=...`
+  - 用于输出搜索引擎友好的文章 HTML。
+- `SeoHtmlService`
+  - 从前端 `dist/index.html` 作为壳页面注入 SEO 内容。
+  - 为文章生成标题、描述、canonical、OG 和 JSON-LD。
+  - 对 Markdown 做基础服务端渲染，保证搜索引擎在不执行前端脚本时也能读到正文。
+- 前端 `ArticlePage`
+  - 运行时继续用 `Helmet` 设置 meta，兼顾正常浏览器访问和社交分享预览。
+
+### 7.3 IndexNow 机制
+
+`IndexNowService` 是“主动通知搜索引擎”的补充机制，不替代 sitemap。
+
+生效前提：
+
+- `app.index-now.enabled=true`
+- `app.index-now.key` 已配置
+- `app.site.base-url` 已配置，并且是站点真实公网地址，例如 `https://www.yaolilin.com`
+
+触发时机：
+
+- 文章新增后，`ArticleController.create()` 调用 `indexNowService.submitArticle(article.getId())`
+- 文章编辑后，`ArticleController.update()` 调用 `submitArticle`
+- 文章删除后，`ArticleController.delete()` 也会调用 `submitArticle(id)`，用于通知搜索引擎该 URL 状态已变化
+
+运行方式：
+
+- 服务启动时，`IndexNowService` 会把 `<key>.txt` 写到前端构建目录根下，供搜索引擎校验 key。
+- 实际提交通知时，会异步向 `app.index-now.endpoint` 发送 JSON 请求，默认地址是 Bing 的 IndexNow 接口。
+- 如果 `app.site.base-url`、`key` 或 `enabled` 任一条件不满足，服务会直接跳过，不影响文章主流程。
+
+### 7.4 如何让搜索引擎真正发现文章
+
+仅仅把文章保存到数据库，还不等于会被搜索引擎发现。部署时至少要满足下面几点：
+
+1. 文章必须有稳定的公网 URL。
+   建议对外统一使用 `/articles/{id}`，不要只在后台或内网路径中可见。
+2. `robots.txt` 和 `sitemap.xml` 必须能被公网直接访问。
+   常见做法是由 Nginx 把 `/robots.txt`、`/sitemap.xml` 代理到后端对应接口。
+3. 文章详情页要么能被服务端直接返回完整 HTML，要么至少要有 SEO 降级页面。
+   本项目推荐把 `/articles/**` 的抓取流量转到 `SeoArticleController` 对应输出。
+4. `app.site.base-url` 必须配置成真实域名。
+   否则 canonical、IndexNow、sitemap 中的域名会不正确，影响抓取和收录。
+5. 新文章需要进入站内链接网络。
+   首页推荐、分类页、最近文章页、相关文章、导航入口都能帮助爬虫从已有页面继续发现新文章。
+6. 如果启用 IndexNow，要确保 `<key>.txt` 可以被搜索引擎访问到。
+   否则主动提交会失败，即使接口本身返回正常也不会真正生效。
+
+### 7.5 运营与排查建议
+
+- 新站或新目录刚上线时，先检查：
+  - `/robots.txt`
+  - `/sitemap.xml`
+  - 任意一个 `/articles/{id}`
+  - 任意一个 `/api/seo/articles/{id}`
+- 如果文章长期不被收录，优先排查：
+  - `app.site.base-url` 是否错误
+  - sitemap 中是否已包含目标文章
+  - Nginx 是否把公开 URL 正确转发到 SEO 页面
+  - 页面是否输出 canonical / description / JSON-LD
+  - IndexNow key 文件是否可直接访问
+- IndexNow 只能加快“发现”与“更新通知”，不能保证一定收录；最终是否收录仍由搜索引擎自己决定。
 
 ## 8. 开发注意事项
 

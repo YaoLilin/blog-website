@@ -19,9 +19,11 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
@@ -115,11 +117,11 @@ public class FileWatcherService {
         if (kind == StandardWatchEventKinds.ENTRY_CREATE || kind == StandardWatchEventKinds.ENTRY_MODIFY) {
             if (file.isDirectory()) {
                 try { registerAll(path); } catch (IOException ignored) {}
-                syncDirectory(file, null);
+                syncDirectory(file, null, null);
             } else if (fileName.endsWith(".md")) {
                 File parent = file.getParentFile();
                 if (parent != null) {
-                    syncDirectory(parent, null);
+                    syncDirectory(parent, null, null);
                 }
             }
         } else if (kind == StandardWatchEventKinds.ENTRY_DELETE) {
@@ -133,7 +135,7 @@ public class FileWatcherService {
                 }
                 File parent = file.getParentFile();
                 if (parent != null) {
-                    syncDirectory(parent, null);
+                    syncDirectory(parent, null, null);
                 }
             } else {
                 String relativePath = toRelativePath(file);
@@ -148,7 +150,7 @@ public class FileWatcherService {
 
                     File parent = file.getParentFile();
                     if (parent != null) {
-                        syncDirectory(parent, null);
+                        syncDirectory(parent, null, null);
                     }
                 }
             }
@@ -163,12 +165,12 @@ public class FileWatcherService {
     public void rescan() {
         long startedAt = System.nanoTime();
         log.info("{} watcher rescan start docsPath={}", DEBUG_PREFIX, docsPath);
-        syncDirectory(new File(docsPath), null);
+        syncDirectory(new File(docsPath), null, null);
         log.info("{} watcher rescan finished in {} ms", DEBUG_PREFIX, elapsedMillis(startedAt));
     }
 
     public void fullSync() {
-        syncDirectory(new File(docsPath), null);
+        syncDirectory(new File(docsPath), null, null);
         List<Article> all = articleRepository.findAll();
         List<Article> orphans = new java.util.ArrayList<>();
         for (Article a : all) {
@@ -210,7 +212,19 @@ public class FileWatcherService {
         registerAll(start);
     }
 
-    private void syncDirectory(File dir, Long parentCategoryId) {
+    public List<Long> syncPathAndCollectChangedArticles(String relativePath) {
+        File start = relativePath == null || relativePath.isBlank()
+                ? new File(docsPath)
+                : Path.of(docsPath).resolve(relativePath).normalize().toFile();
+        if (!start.exists()) {
+            return List.of();
+        }
+        Set<Long> changedArticleIds = new LinkedHashSet<>();
+        syncDirectory(start, null, changedArticleIds);
+        return List.copyOf(changedArticleIds);
+    }
+
+    private void syncDirectory(File dir, Long parentCategoryId, Set<Long> changedArticleIds) {
         if (!dir.exists() || !dir.isDirectory()) return;
         String dirName = dir.getName();
         if (dirName.startsWith(".")) return;
@@ -248,9 +262,9 @@ public class FileWatcherService {
                 continue;
             }
             if (f.isDirectory()) {
-                syncDirectory(f, finalCatId);
+                syncDirectory(f, finalCatId, changedArticleIds);
             } else if (f.isFile() && f.getName().endsWith(".md")) {
-                syncFileWithCategory(f, finalCatId);
+                syncFileWithCategory(f, finalCatId, changedArticleIds);
             }
         }
         long elapsedMs = elapsedMillis(startedAt);
@@ -368,24 +382,41 @@ public class FileWatcherService {
                 } catch (Exception e) {
                     log.error("同步文章失败: {}", path, e);
                 }
-            }, () -> syncFileWithCategory(file, null));
+            }, () -> syncFileWithCategory(file, null, null));
         } catch (IOException e) {
             log.error("读取文件失败: {}", path, e);
         }
     }
 
-    private void syncFileWithCategory(File file, Long categoryId) {
+    private void syncFileWithCategory(File file, Long categoryId, Set<Long> changedArticleIds) {
         String path = file.getAbsolutePath();
         try {
             String content = Files.readString(file.toPath());
             String title = extractTitle(file.getName(), content);
             resolveCanonicalArticle(path).ifPresentOrElse(article -> {
                 try {
-                    article.setContent(content);
+                    boolean changed = false;
+                    if (!Objects.equals(article.getContent(), content)) {
+                        article.setContent(content);
+                        changed = true;
+                    }
                     if (article.getTitle() == null || article.getTitle().isBlank()) {
                         article.setTitle(title);
+                        changed = true;
                     }
-                    articleRepository.save(article);
+                    if (!Objects.equals(article.getCategoryId(), categoryId)) {
+                        article.setCategoryId(categoryId);
+                        changed = true;
+                    }
+                    if (!Objects.equals(article.getFilePath(), path)) {
+                        article.setFilePath(path);
+                        changed = true;
+                    }
+                    if (!changed) {
+                        return;
+                    }
+                    Article savedArticle = articleRepository.save(article);
+                    collectChangedArticleId(savedArticle, changedArticleIds);
                 } catch (Exception e) {
                     log.error("更新文章失败: {}", path, e);
                 }
@@ -397,7 +428,8 @@ public class FileWatcherService {
                     article.setCategoryId(categoryId);
                     article.setIsServerManaged(true);
                     article.setFilePath(path);
-                    articleRepository.save(article);
+                    Article savedArticle = articleRepository.save(article);
+                    collectChangedArticleId(savedArticle, changedArticleIds);
                     log.info("从文件导入新文章: {}", title);
                 } catch (Exception e) {
                     log.error("导入文章失败: {}", path, e);
@@ -498,6 +530,13 @@ public class FileWatcherService {
             if (line.startsWith("# ")) return line.substring(2).trim();
         }
         return filename.replace(".md", "");
+    }
+
+    private void collectChangedArticleId(Article article, Set<Long> changedArticleIds) {
+        if (changedArticleIds == null || article == null || article.getId() == null) {
+            return;
+        }
+        changedArticleIds.add(article.getId());
     }
 
     private boolean shouldIgnorePath(String fileName) {

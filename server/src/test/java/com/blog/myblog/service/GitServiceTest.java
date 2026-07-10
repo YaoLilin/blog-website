@@ -15,6 +15,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GitServiceTest {
 
+    private static final IndexNowService NO_OP_INDEX_NOW = new IndexNowService(null, null) {
+        @Override
+        public void submitArticles(java.util.Collection<Long> articleIds) {
+        }
+    };
+
     @TempDir
     private Path tempDir;
 
@@ -43,7 +49,7 @@ class GitServiceTest {
             assertTrue(Files.exists(docsDir.resolve(".git")));
         }
 
-        GitService service = new GitService(null);
+        GitService service = new GitService(null, NO_OP_INDEX_NOW);
         ReflectionTestUtils.setField(service, "docsPath", docsDir.toString());
 
         Map<String, Object> result = service.pull("origin", "", "", null, false);
@@ -88,7 +94,7 @@ class GitServiceTest {
             updater.push().setRemote("origin").call();
         }
 
-        GitService service = new GitService(null);
+        GitService service = new GitService(null, NO_OP_INDEX_NOW);
         ReflectionTestUtils.setField(service, "docsPath", docsDir.toString());
 
         Map<String, Object> result = service.pull("origin", "", "", null, false);

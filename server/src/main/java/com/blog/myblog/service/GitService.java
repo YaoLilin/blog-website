@@ -38,6 +38,7 @@ public class GitService {
     private String docsPath;
 
     private final FileWatcherService fileWatcherService;
+    private final IndexNowService indexNowService;
 
     private Git openRepo(String repoRelativePath) throws IOException {
         Path gitDir = locateGitDir(repoRelativePath);
@@ -134,6 +135,17 @@ public class GitService {
                     DEBUG_PREFIX, opId, elapsedMillis(pullStartedAt));
             result.put("success", pullResult.isSuccessful());
             result.put("hasConflicts", hasPullConflicts(pullResult));
+            if (pullResult.isSuccessful()) {
+                long syncStartedAt = System.nanoTime();
+                List<Long> changedArticleIds = fileWatcherService == null
+                        ? List.of()
+                        : fileWatcherService.syncPathAndCollectChangedArticles(repoRelativePath);
+                log.info("{} op={} docs sync finished in {} ms, changedArticles={}",
+                        DEBUG_PREFIX, opId, elapsedMillis(syncStartedAt), changedArticleIds.size());
+                if (indexNowService != null && !changedArticleIds.isEmpty()) {
+                    indexNowService.submitArticles(changedArticleIds);
+                }
+            }
             log.info("{} op={} pull result success={} hasConflicts={}",
                     DEBUG_PREFIX, opId, pullResult.isSuccessful(), hasPullConflicts(pullResult));
         } catch (CheckoutConflictException e) {
