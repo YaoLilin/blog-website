@@ -442,11 +442,11 @@ export function ArticlePage() {
         {/* 顶部：面包屑 + 收缩按钮（固定，不随内容滚动） */}
         <div className="shrink-0 flex items-start gap-1 px-2 py-3 border-b border-zinc-100 dark:border-zinc-800">
           {tocOpen && breadcrumb.length > 0 && (
-            <div className="flex items-center gap-1 text-xs text-zinc-500 flex-wrap flex-1 min-w-0">
+            <div className="flex items-center gap-1 text-[14px] text-zinc-500 dark:text-[#ccc] flex-wrap flex-1 min-w-0">
               {breadcrumb.map((cat, i) => (
                 <span key={cat.id} className="flex items-center gap-1">
                   {i > 0 && <ChevronRight size={10} />}
-                  <Link to={`/categories/${cat.id}`} className="hover:text-zinc-900 dark:hover:text-zinc-100 break-all">
+                  <Link to={`/categories/${cat.id}`} className="hover:text-zinc-900 dark:hover:text-[#ccc] break-all">
                     {cat.name}
                   </Link>
                 </span>
@@ -469,14 +469,18 @@ export function ArticlePage() {
               <>
                 <p className="text-xs font-medium text-zinc-400 uppercase mb-2">目录</p>
                 <nav className="space-y-1">
-                  {toc.map(item => (
+                  {toc.map((item, index) => (
                     <button
                       key={item.id}
                       onClick={() => scrollToHeading(item.id)}
-                      className={`block w-full text-left text-xs py-1 px-2 rounded truncate transition-colors ${
-                        activeTocId === item.id
-                          ? 'text-zinc-900 dark:text-zinc-100 bg-zinc-100 dark:bg-zinc-800'
-                          : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
+                      className={`block w-full text-left py-1 px-2 rounded truncate transition-colors ${item.level === 2 && index > 0 ? 'mt-3' : ''} ${
+                        item.level === 2
+                          ? activeTocId === item.id
+                            ? 'text-[14px] text-black dark:text-white bg-zinc-100 dark:bg-zinc-800'
+                            : 'text-[14px] text-black dark:text-white hover:text-black dark:hover:text-white'
+                          : activeTocId === item.id
+                            ? 'text-xs text-[#333] dark:text-[#ccc] bg-zinc-100 dark:bg-zinc-800'
+                            : 'text-xs text-[#333] dark:text-[#ccc] hover:text-[#333] dark:hover:text-[#ccc]'
                       }`}
                       style={{ paddingLeft: `${8 + (item.level - 2) * 12}px` }}
                     >
@@ -583,20 +587,23 @@ export function ArticlePage() {
       </main>
 
       {/* 右侧：下级标题目录 + 有帮助 */}
-      <aside className="w-48 shrink-0 hidden xl:flex flex-col sticky top-14 h-[calc(100vh-3.5rem)] p-4">
-        <div className="flex-1 overflow-y-auto">
-          {subTocForActiveH3.length > 0 ? (
-            <>
+      <aside className="w-[300px] max-w-full shrink-0 hidden xl:flex flex-col sticky top-14 h-[calc(100vh-3.5rem)] py-4">
+        {subTocForActiveH3.length > 0 && (
+          <div className="w-full self-start max-h-full overflow-y-auto rounded-xl border border-zinc-200/80 bg-white px-3 py-3 dark:border-zinc-800 dark:bg-zinc-900">
             <p className="text-xs font-medium text-zinc-400 uppercase mb-2">小节</p>
             <nav className="space-y-1">
               {subTocForActiveH3.map(item => (
                 <button
                   key={item.id}
                   onClick={() => scrollToHeading(item.id)}
-                  className={`block w-full text-left text-xs py-1 px-2 rounded truncate transition-colors ${
-                    activeSubTocId === item.id
-                      ? 'text-zinc-900 dark:text-zinc-100 bg-zinc-100 dark:bg-zinc-800'
-                      : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
+                  className={`block w-full text-left py-1 px-2 rounded truncate transition-colors ${
+                    item.level === 4
+                      ? activeSubTocId === item.id
+                        ? 'text-[14px] text-black dark:text-white bg-zinc-100 dark:bg-zinc-800'
+                        : 'text-[14px] text-black dark:text-white hover:text-black dark:hover:text-white'
+                      : activeSubTocId === item.id
+                        ? 'text-xs text-[#333] dark:text-[#ccc] bg-zinc-100 dark:bg-zinc-800'
+                        : 'text-xs text-[#333] dark:text-[#ccc] hover:text-[#333] dark:hover:text-[#ccc]'
                   }`}
                   style={{ paddingLeft: `${8 + (item.level - 4) * 12}px` }}
                 >
@@ -604,11 +611,8 @@ export function ArticlePage() {
                 </button>
               ))}
             </nav>
-            </>
-          ) : (
-            <div aria-hidden="true" />
-          )}
-        </div>
+          </div>
+        )}
 
 
       </aside>

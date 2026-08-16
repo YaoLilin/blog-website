@@ -140,7 +140,7 @@
 | `app.docs.path` | 文档目录 |
 | `app.image.storage.path` | 图片存储目录 |
 | `app.attachment.storage.path` | 附件存储目录 |
-| `app.frontend.dist.path` | 前端构建目录 |
+| `app.frontend.dist.path` | 前端构建目录；默认由 `APP_FRONTEND_DIST_PATH` 覆盖或使用生产路径 `/opt/myblog/dist`，SEO HTML 会从此目录读取 React 入口 |
 | `app.site.base-url` | 站点对外公开访问地址，用于 sitemap、canonical、IndexNow |
 | `app.site.name` | 站点名称，用于 SEO 标题 |
 | `app.site.author` | 站点作者，用于结构化数据 |
@@ -514,7 +514,7 @@ SEO 由后端和 Nginx 配合：
 - `/api/sitemap.xml` 根据分类和文章生成站点地图。
 - `/api/seo/articles/{id}` 按文章 ID 输出 HTML。
 - `/api/seo/articles/view?path=...` 按文件路径输出 HTML。
-- Nginx 可将 `/robots.txt`、`/sitemap.xml` 和 `/articles/**` 代理到后端 SEO 接口。
+- Nginx 将 `/robots.txt`、`/sitemap.xml` 和 `/articles/**` 代理到后端 SEO 接口；SEO HTML 必须保留前端入口脚本，使 React 在浏览器加载后接管文章页面。
 - 前端页面使用 `react-helmet-async` 设置标题和描述。
 
 ### 7.1 搜索引擎发现文章的机制
@@ -579,7 +579,7 @@ SEO 由后端和 Nginx 配合：
 2. `robots.txt` 和 `sitemap.xml` 必须能被公网直接访问。
    常见做法是由 Nginx 把 `/robots.txt`、`/sitemap.xml` 代理到后端对应接口。
 3. 文章详情页要么能被服务端直接返回完整 HTML，要么至少要有 SEO 降级页面。
-   本项目推荐把 `/articles/**` 的抓取流量转到 `SeoArticleController` 对应输出。
+   本项目推荐把 `/articles/**` 的抓取流量转到 `SeoArticleController` 对应输出；输出的 SEO HTML 保留 React 入口脚本，浏览器加载后由 `ArticlePage` 接管渲染。
 4. `app.site.base-url` 必须配置成真实域名。
    否则 canonical、IndexNow、sitemap 中的域名会不正确，影响抓取和收录。
 5. 新文章需要进入站内链接网络。

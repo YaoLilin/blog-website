@@ -63,7 +63,7 @@ app:
       size: 52428800
   frontend:
     dist:
-      path: /Users/yaolilin/IdeaProjects/myblog/frontend/dist
+      path: ${APP_FRONTEND_DIST_PATH:/opt/myblog/dist}
 
 logging:
   level:

@@ -32,6 +32,7 @@ class SeoHtmlServiceTest {
                   </head>
                   <body>
                     <div id="root"></div>
+                    <script type="module" src="/assets/index.js"></script>
                   </body>
                 </html>
                 """);
@@ -46,6 +47,7 @@ class SeoHtmlServiceTest {
 
         assertTrue(html.contains("<title>测试文章 - 姚礼林的博客</title>"));
         assertTrue(html.contains("content=\"测试文章 - 姚礼林的博客\""));
+        assertTrue(html.contains("<script type=\"module\" src=\"/assets/index.js\"></script>"));
     }
 
     @Test
