@@ -43,7 +43,7 @@ class FileWatcherServiceTest {
         FileWatcherService service = new FileWatcherService(articleRepository.proxy(), emptyCategoryRepository());
         ReflectionTestUtils.setField(service, "docsPath", tempDir.toString());
 
-        ReflectionTestUtils.invokeMethod(service, "syncFileWithCategory", articleFile.toFile(), null);
+        ReflectionTestUtils.invokeMethod(service, "syncFileWithCategory", articleFile.toFile(), null, null);
 
         assertEquals("Database Title", article.getTitle());
         assertEquals("# Heading From File\ncontent", article.getContent());
@@ -70,7 +70,7 @@ class FileWatcherServiceTest {
         FileWatcherService service = new FileWatcherService(articleRepository.proxy(), emptyCategoryRepository());
         ReflectionTestUtils.setField(service, "docsPath", tempDir.toString());
 
-        ReflectionTestUtils.invokeMethod(service, "syncFileWithCategory", articleFile.toFile(), null);
+        ReflectionTestUtils.invokeMethod(service, "syncFileWithCategory", articleFile.toFile(), null, null);
 
         assertEquals(List.of(duplicate), articleRepository.deletedArticles);
         assertEquals("# Heading From File\ncontent", first.getContent());
@@ -100,7 +100,7 @@ class FileWatcherServiceTest {
         FileWatcherService service = new FileWatcherService(articleRepository.proxy(), emptyCategoryRepository());
         ReflectionTestUtils.setField(service, "docsPath", docsRoot.toString());
 
-        ReflectionTestUtils.invokeMethod(service, "syncFileWithCategory", articleFile.toFile(), null);
+        ReflectionTestUtils.invokeMethod(service, "syncFileWithCategory", articleFile.toFile(), null, null);
 
         assertEquals(articleFile.toString(), legacy.getFilePath());
         assertEquals(List.of(duplicate), articleRepository.deletedArticles);
@@ -179,7 +179,7 @@ class FileWatcherServiceTest {
         FileWatcherService service = new FileWatcherService(articleRepository.proxy(), categoryRepository.proxy());
         ReflectionTestUtils.setField(service, "docsPath", docsRoot.toString());
 
-        ReflectionTestUtils.invokeMethod(service, "syncDirectory", categoryDir.toFile(), null);
+        ReflectionTestUtils.invokeMethod(service, "syncDirectory", categoryDir.toFile(), null, null);
 
         assertEquals(1, articleRepository.articlesByPath.values().stream().mapToInt(List::size).sum());
         assertTrue(articleRepository.articlesByPath.keySet().stream().noneMatch(path -> path.contains("._README.md")));

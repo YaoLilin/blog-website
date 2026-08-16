@@ -1,6 +1,86 @@
-# 博客系统
+# <center>博客网站
+<div style="text-align: center;">个人博客网站，包含文章创建、文章编辑等文章管理功能，支持文章分类和文章搜索，我使用它搭建了我的个人网站</div>
 
-一个完整的前后端分离博客系统，包含前台展示、后台管理、文章分类、Markdown 编辑、统计分析等功能。
+你可以访问我的个人网站查看效果：[https://yaolilin.com](https://yaolilin.com)
+
+## 主要功能
+### 首页
+#### 文章
+你可以在首页展示文章分类，推荐文章（后台可管理推荐文章）和最近文章  
+
+![img.png](images/img.png)
+
+#### 项目展示
+你可以在首页展示你的项目，展示的项目可在后台进行管理，点击项目卡片可查看项目介绍以及项目链接。  
+
+![img_1.png](images/img_1.png)
+
+![img_2.png](images/img_2.png)
+
+#### 个人介绍
+在首页可以展示你的个人介绍，可以在后台配置个人介绍的图片，以及使用 Markdown 编辑个人介绍内容。  
+
+![img_3.png](images/img_3.png)
+
+### 文章功能
+#### 文章分类
+在文章分类页面中可以看到文章分类，你可以把文章放到分类中，就像写笔记一样。分类支持配置分类的封面图片。
+该页面的下方还列出了最近的文章。
+
+![img_4.png](images/img_4.png)
+
+文章分类还提供图标和树形显示两种方式，下面是树形显示效果：  
+
+![img_5.png](images/img_5.png)
+
+#### 文章页面
+你可以使用 Markdown 编写你的文章，编写文章时支持即时预览编辑。文章显示时可渲染 Markdown 内容，支持代码高亮显示
+以及流程图、公式等 Markdown 内容。
+文章左侧显示了二级和三级标题，右侧小节显示四级以下标题。
+
+文章显示页面  
+
+![img_7.png](images/img_7.png)
+
+文章编写页面，支持即时预览编辑，也就是编辑和预览 Markdown 在同一个页面，编辑即预览，你无需切换预览模式查看文章效果。
+
+![img_8.png](images/img_8.png)
+
+#### 文章搜索
+可以使用快捷键打开搜索对话框，支持搜索文章标题以及文章内容  
+
+![img_9.png](images/img_9.png)
+
+### 明暗主题
+支持深色模式和浅色模式切换，可根据时间自动切换主题，或者手动切换主题。  
+
+深色模式主题：  
+![img_10.png](images/img_10.png)
+
+![img_11.png](images/img_11.png)
+
+### 后台管理 
+你可以使用管理员密码进入后台页面，在后台页面进行文章管理、网站设置等功能。
+
+#### 文章管理  
+你可以在这里管理文章分类和文章，文章支持丛 git 仓库导入，比如你可以从 github 仓库将文章导入到你的博客
+网站中，并支持 git 同步，你可以从 git 更新你的博客网站的文章，或者从博客网站推送文章更新到
+ git 仓库中。  
+
+![img_12.png](images/img_12.png)
+
+#### 统计
+在后台统计页面你可以看到网站的访问统计以及文章的阅读统计，你可以在这里了解你的网站的访问情况，你还
+可以看到文章的阅读量统计排行，查看哪些文章是受欢迎的。  
+
+![img_13.png](images/img_13.png)
+
+### 搜索引擎搜索
+网站具有站点地图：`/api/sitemap.xml` ，将该站点地图提交到搜索引擎中即可添加文章索引，让搜索引擎可搜索到
+你的文章。网站还支持必应 IndexNow ，每次文章更新都会请求 `IndexNow` 接口，让搜索引擎更新你的文章索引。
+
+## 功能详细说明
+查看该文档查看功能的详细设计：[project-development-guide.md](docs/project-development-guide.md)
 
 ## 项目结构
 
@@ -124,8 +204,8 @@ app:
   site:
     base-url: https://your-domain.com
   index-now:
-    enabled: true
-    key: your-indexnow-key
+    enabled: false
+    key: 
   docs:
     path: /path/to/your/docs
   image:
@@ -137,7 +217,26 @@ app:
   frontend:
     dist:
       path: /path/to/frontend/dist
+
+logging:
+  file:
+    name: log/app.log
+  logback:
+    rollingpolicy:
+      file-name-pattern: log/app.%d{yyyy-MM-dd}.%i.gz
+      max-file-size: 50MB
+      max-history: 30
+      total-size-cap: 1GB
 ```
+
+文件路径配置说明：
+
+- `app.docs.path`：服务器管理文档根目录。Git 同步和文件监听会从此目录创建、更新分类和 Markdown 文章；其中的文件可通过 `/api/docs-static/**` 和 `/docs-static/**` 访问。
+- `app.image.storage.path`：后台上传图片的存储目录。上传后返回 `/api/static/images/**` 地址；服务器管理文章保存时，会将其中引用的图片迁移到对应文档目录。
+- `app.attachment.storage.path`：后台上传附件的存储目录。上传后返回 `/api/static/attachments/**` 地址；服务器管理文章保存时，会将其中引用的附件迁移到对应文档目录。
+- `app.frontend.dist.path`：前端 `npm run build` 生成的 `dist` 目录。Nginx 用它作为网站静态根目录；后端生成 SEO 文章页时读取其中的 `index.html` 和 React 入口脚本，IndexNow key 文件也会写入此目录。生产环境默认使用 `/opt/myblog/dist`，可用环境变量 `APP_FRONTEND_DIST_PATH` 覆盖。
+- `logging.file.name`：应用日志文件路径。`log/app.log` 是相对路径，按 Java 进程当前工作目录解析；国内生产服务工作目录为 `/opt/myblog`，实际日志文件为 `/opt/myblog/log/app.log`。
+- `logging.logback.rollingpolicy.*`：日志滚动策略。归档文件写入相对路径 `log/app.%d{yyyy-MM-dd}.%i.gz`；当前日志达到 50MB 时滚动，保留 30 天，归档总量不超过 1GB。
 
 数据源说明：
 
@@ -156,12 +255,24 @@ app:
 
 #### 5. 配置 Nginx
 
-复制 Nginx 配置：
+按以下步骤配置 Nginx：
+
+1. 打开 `nginx/blog.conf`，把其中的前端 `root`、图片/附件/文档 `alias` 和后端 `proxy_pass` 路径改为当前机器的实际部署路径。
+2. 将配置复制到 Nginx 站点配置目录。以下命令适用于 Debian/Ubuntu 默认目录；其他发行版请改为对应的 `conf.d` 目录。
+3. 创建站点启用软链接，使 Nginx 主配置加载该站点配置。
+4. 先执行语法检查。只有 `nginx -t` 显示成功后，才重载 Nginx；检查失败时不要重载，应根据报错修正配置后再试。
 
 ```bash
+# 复制项目中的站点配置
 sudo cp nginx/blog.conf /etc/nginx/sites-available/blog
+
+# 启用站点；已存在同名软链接时无需重复执行
 sudo ln -s /etc/nginx/sites-available/blog /etc/nginx/sites-enabled/blog
+
+# 检查配置语法和引用路径
 sudo nginx -t
+
+# 检查成功后重新加载，不中断现有连接
 sudo systemctl reload nginx
 ```
 
@@ -202,7 +313,7 @@ npm run dev
 
 默认管理员密码：`admin`
 
-## 主要功能
+## 网站功能
 
 ### 前台功能
 
@@ -226,27 +337,6 @@ npm run dev
 - **文件系统同步**: 双向同步（数据库 ↔ 服务器文件）
 - **阅读数统计**: 去重统计，同一浏览器一天只算一次
 
-## 开发说明
-
-### 前端开发
-
-```bash
-cd frontend
-npm run dev    # 启动开发服务器
-npm run build  # 构建生产版本
-npm run lint   # 运行 ESLint
-npm run test   # 运行测试
-```
-
-### 后端开发
-
-```bash
-cd server
-./mvnw spring-boot:run    # 启动开发服务器
-./mvnw clean package   # 构建生产版本
-./mvnw test            # 运行测试
-```
-
 ## 部署说明
 
 ### 生产环境部署
@@ -260,26 +350,10 @@ cd server
 - 附件目录：`/opt/myblog/static/attachments`
 - 后端 JAR：`/opt/myblog/app.jar`
 - 后端配置：`/opt/myblog/application.yml`
-- 后端日志：`/opt/myblog/app.log`
+- 后端日志：`/opt/myblog/log/app.log`
 - 后端 API：`http://127.0.0.1:8081/api`
 
-生产配置变量：
-
-| 配置项 | 默认值 | 用途 |
-| --- | --- | --- |
-| `APP_ROOT` | `/opt/myblog` | 部署根目录 |
-| `FRONTEND_DIST` | `/opt/myblog/dist` | Nginx 前端 `root` |
-| `BACKEND_PORT` | `8081` | Spring Boot 服务端口 |
-| `BACKEND_UPSTREAM` | `http://127.0.0.1:8081` | Nginx 反向代理上游 |
-| `BACKEND_CONTEXT_PATH` | `/api` | 后端 API 前缀 |
-| `APP_JAR` | `/opt/myblog/app.jar` | 后端 JAR 路径 |
-| `APP_CONFIG` | `/opt/myblog/application.yml` | 后端配置文件 |
-| `APP_LOG` | `/opt/myblog/app.log` | 后端日志文件 |
-| `DOCS_DIR` | `/opt/myblog/docs` | 管理文档目录，映射 `/api/docs-static/**` 和 `/docs-static/**` |
-| `IMAGE_DIR` | `/opt/myblog/static/images` | 图片静态资源目录 |
-| `ATTACHMENT_DIR` | `/opt/myblog/static/attachments` | 附件静态资源目录 |
-
-对应后端 `application.yml`：
+后端 `application.yml`：
 
 ```yaml
 server:
@@ -310,10 +384,19 @@ app:
   frontend:
     dist:
       path: /opt/myblog/dist
+logging:
+  file:
+    name: log/app.log
+  logback:
+    rollingpolicy:
+      file-name-pattern: log/app.%d{yyyy-MM-dd}.%i.gz
+      max-file-size: 50MB
+      max-history: 30
+      total-size-cap: 1GB
   site:
     base-url: https://your-domain.com
   index-now:
-    enabled: true
+    enabled: false
     key: your-indexnow-key
 ```
 
@@ -363,7 +446,8 @@ cd /opt/myblog
 mv app.jar app.jar.old 2>/dev/null || true
 mv app.jar.new app.jar
 pkill -f 'java.*app.jar' 2>/dev/null || true
-LANG=C.UTF-8 LC_ALL=C.UTF-8 nohup java -Dfile.encoding=UTF-8 -jar app.jar --spring.config.location=/opt/myblog/application.yml > /opt/myblog/app.log 2>&1 &
+mkdir -p /opt/myblog/log
+LANG=C.UTF-8 LC_ALL=C.UTF-8 nohup java -Dfile.encoding=UTF-8 -jar app.jar --spring.config.location=/opt/myblog/application.yml > /opt/myblog/log/nohup.log 2>&1 &
 ```
 
 或使用 systemd 服务：
@@ -405,7 +489,7 @@ nginx -s reload
 
 ```bash
 ps aux | grep 'java.*app.jar' | grep -v grep
-tail -f /opt/myblog/app.log
+tail -f /opt/myblog/log/app.log
 curl -s -o /dev/null -w 'API: HTTP %{http_code}\n' http://127.0.0.1:8081/api/articles
 ```
 
@@ -441,7 +525,7 @@ NGINX_CONF=/etc/nginx/conf.d/myblog.conf \
 | `ATTACHMENT_DIR` | `$APP_ROOT/static/attachments` | 附件目录 |
 | `APP_JAR` | `$APP_ROOT/app.jar` | 后端 JAR |
 | `APP_CONFIG` | `$APP_ROOT/application.yml` | 后端配置 |
-| `APP_LOG` | `$APP_ROOT/app.log` | 后端日志 |
+| `APP_LOG` | `$APP_ROOT/log/app.log` | 后端应用日志 |
 | `BACKEND_PORT` | `8081` | 后端端口 |
 | `BACKEND_CONTEXT_PATH` | `/api` | API 前缀 |
 | `SERVICE_NAME` | `myblog` | systemd 服务名 |
@@ -459,19 +543,6 @@ NGINX_CONF=/etc/nginx/conf.d/myblog.conf \
 3. 安装或更新 systemd 服务，并使用 `-Dfile.encoding=UTF-8` 启动后端。
 4. 生成 Nginx 配置，其中 `/api/docs-static/**` 和 `/docs-static/**` 直接 `alias` 到文档目录，适合大文件下载。
 5. 执行 `nginx -t`、reload，并验证本机 API。
-
-## 数据库设计
-
-主要数据表：
-
-- `category`: 分类表（支持多级分类）
-- `article`: 文章表
-- `image`: 图片表
-- `attachment`: 附件表
-- `view_record`: 阅读统计表
-- `system_setting`: 系统设置表
-
-详细表结构请查看 `server/src/main/resources/schema.sql`。
 
 ## 注意事项
 
@@ -492,7 +563,7 @@ NGINX_CONF=/etc/nginx/conf.d/myblog.conf \
    - 备份静态资源（images/ 和 attachments/）
 
 4. **日志**
-   - 检查后端日志：`/opt/myblog/app.log`
+   - 检查后端日志：`/opt/myblog/log/app.log`
    - 检查 Nginx 日志：`/var/log/nginx/` 或服务器实际 Nginx 日志目录
 
 ## 许可证

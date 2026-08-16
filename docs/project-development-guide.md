@@ -141,6 +141,8 @@
 | `app.image.storage.path` | 图片存储目录 |
 | `app.attachment.storage.path` | 附件存储目录 |
 | `app.frontend.dist.path` | 前端构建目录；默认由 `APP_FRONTEND_DIST_PATH` 覆盖或使用生产路径 `/opt/myblog/dist`，SEO HTML 会从此目录读取 React 入口 |
+| `logging.file.name` | 应用日志文件。相对路径 `log/app.log` 按 Java 进程工作目录解析；国内生产服务实际写入 `/opt/myblog/log/app.log` |
+| `logging.logback.rollingpolicy.*` | Logback 日志滚动策略。归档文件使用相对路径 `log/app.%d{yyyy-MM-dd}.%i.gz`；单文件上限 50MB、保留 30 天、归档总量上限 1GB |
 | `app.site.base-url` | 站点对外公开访问地址，用于 sitemap、canonical、IndexNow |
 | `app.site.name` | 站点名称，用于 SEO 标题 |
 | `app.site.author` | 站点作者，用于结构化数据 |
