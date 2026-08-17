@@ -1,4 +1,4 @@
-import { Moon, Search, Settings, Sun } from 'lucide-react'
+import { Moon, Search, Settings, Sun, SunMoon } from 'lucide-react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { api } from '../api'
@@ -301,31 +301,35 @@ export function Navbar() {
               className="h-8 w-8"
               title={themeMode === 'dark' ? '深色' : themeMode === 'light' ? '浅色' : '自动'}
             >
-              {theme === 'dark' ? <Moon size={16} /> : <Sun size={16} />}
+              {themeMode === 'system' ? <SunMoon size={16} /> : theme === 'dark' ? <Moon size={16} /> : <Sun size={16} />}
             </Button>
             {showThemeMenu && (
               <div className="absolute right-0 top-full mt-2 min-w-24 rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-1 shadow-lg z-50">
                 {[
-                  { value: 'system', label: '自动' },
-                  { value: 'light', label: '浅色' },
-                  { value: 'dark', label: '深色' },
-                ].map(opt => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => {
-                      setThemeMode(opt.value as 'light' | 'dark' | 'system')
-                      setShowThemeMenu(false)
-                    }}
-                    className={`block w-full rounded px-3 py-2 text-left text-sm ${
-                      themeMode === opt.value
-                        ? 'bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100'
-                        : 'text-zinc-600 hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-zinc-800'
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
+                  { value: 'system', label: '自动', icon: SunMoon },
+                  { value: 'light', label: '浅色', icon: Sun },
+                  { value: 'dark', label: '深色', icon: Moon },
+                ].map(opt => {
+                  const Icon = opt.icon
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => {
+                        setThemeMode(opt.value as 'light' | 'dark' | 'system')
+                        setShowThemeMenu(false)
+                      }}
+                      className={`flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm ${
+                        themeMode === opt.value
+                          ? 'bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100'
+                          : 'text-zinc-600 hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-zinc-800'
+                      }`}
+                    >
+                      <Icon size={14} aria-hidden="true" />
+                      {opt.label}
+                    </button>
+                  )
+                })}
               </div>
             )}
           </div>
