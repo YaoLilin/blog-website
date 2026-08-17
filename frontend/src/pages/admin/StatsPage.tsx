@@ -3,6 +3,15 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianG
 import { api } from '../../api'
 import type { ViewStats } from '../../types'
 
+const tooltipContentStyle = {
+  backgroundColor: 'var(--popover)',
+  border: '1px solid var(--border)',
+  borderRadius: '0.5rem',
+  color: 'var(--popover-foreground)',
+}
+
+const tooltipTextStyle = { color: 'var(--popover-foreground)' }
+
 export function StatsPage() {
   const [stats, setStats] = useState<ViewStats | null>(null)
 
@@ -35,7 +44,13 @@ export function StatsPage() {
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.05)" />
                 <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={(d: unknown) => String(d).slice(5)} />
                 <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                <Tooltip labelFormatter={(d) => `日期: ${d}`} formatter={(v) => [Number(v), '阅读数']} />
+                <Tooltip
+                  contentStyle={tooltipContentStyle}
+                  labelStyle={tooltipTextStyle}
+                  itemStyle={tooltipTextStyle}
+                  labelFormatter={(d) => `日期: ${d}`}
+                  formatter={(v) => [Number(v), '阅读数']}
+                />
                 <Line type="monotone" dataKey="count" name="阅读数" stroke="currentColor" className="stroke-zinc-700 dark:stroke-zinc-300" strokeWidth={2} dot={false} />
               </LineChart>
             </ResponsiveContainer>
@@ -53,7 +68,13 @@ export function StatsPage() {
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.05)" />
                 <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={(d: unknown) => String(d).slice(5)} />
                 <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                <Tooltip labelFormatter={(d) => `日期: ${d}`} formatter={(v) => [Number(v), '访问次数']} />
+                <Tooltip
+                  contentStyle={tooltipContentStyle}
+                  labelStyle={tooltipTextStyle}
+                  itemStyle={tooltipTextStyle}
+                  labelFormatter={(d) => `日期: ${d}`}
+                  formatter={(v) => [Number(v), '访问次数']}
+                />
                 <Line type="monotone" dataKey="count" name="访问次数" stroke="#3b82f6" strokeWidth={2} dot={false} />
               </LineChart>
             </ResponsiveContainer>
