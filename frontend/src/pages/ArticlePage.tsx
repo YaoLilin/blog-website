@@ -15,6 +15,7 @@ import { Input } from '../components/ui/input'
 import { FeedbackDialog, type FeedbackDialogState } from '../components/feedback-dialog'
 import { VditorEditor } from '../components/VditorEditor'
 import { SITE_CONFIG } from '../config/site'
+import { ArticleMetadata } from '../components/ArticleMetadata'
 
 interface TocItem {
   id: string
@@ -428,10 +429,8 @@ export function ArticlePage() {
     <>
       <Helmet>
         <title>{article.title} - {SITE_CONFIG.name}</title>
-        <meta name="description" content={article.title} />
-        <meta property="og:title" content={`${article.title} - ${SITE_CONFIG.name}`} />
-        <meta property="og:description" content={article.title} />
       </Helmet>
+      <ArticleMetadata article={article} />
       <div className="flex gap-0">
       {/* 左侧：目录 + 分类导航 */}
       <aside

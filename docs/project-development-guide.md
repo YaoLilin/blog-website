@@ -548,7 +548,9 @@ SEO 由后端和 Nginx 配合：
   - 为文章生成标题、描述、canonical、OG 和 JSON-LD。
   - 对 Markdown 做基础服务端渲染，保证搜索引擎在不执行前端脚本时也能读到正文。
 - 前端 `ArticlePage`
-  - 运行时继续用 `Helmet` 设置 meta，兼顾正常浏览器访问和社交分享预览。
+  - 文章 API 的只读 `description` 字段由 `ArticleSummary` 从正文生成：去除注释、代码块、图片及格式标记，保留链接文字，最多 160 个 Unicode 字符；正文为空时返回无可用摘要提示。
+  - 服务端 SEO HTML 的 description、OG description 和 JSON-LD description 均使用同一摘要，输出前清除壳页面中的旧 description 和文章 OG 标签。
+  - 运行时 `Helmet` 设置标题，`ArticleMetadata` 复用 API 摘要更新并去重 head 中的 description、OG description、OG title 和 OG type；文章路由不添加全站简介，确保每种标签仅一条。离开文章页时清理这些标签。
 
 ### 7.3 IndexNow 机制
 

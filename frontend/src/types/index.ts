@@ -13,6 +13,7 @@ export interface Article {
   id: number
   title: string
   content: string
+  description: string
   categoryId: number
   filePath?: string | null
   category?: Category

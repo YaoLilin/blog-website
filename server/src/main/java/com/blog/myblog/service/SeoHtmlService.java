@@ -24,7 +24,8 @@ import java.util.regex.Pattern;
 public class SeoHtmlService {
 
     private static final Pattern TITLE_PATTERN = Pattern.compile("(?is)<title>.*?</title>");
-    private static final Pattern DESCRIPTION_PATTERN = Pattern.compile("(?is)<meta\\s+name=[\"']description[\"'][^>]*>");
+    private static final Pattern ARTICLE_META_PATTERN = Pattern.compile(
+            "(?is)<meta\\b(?=[^>]*\\b(?:name\\s*=\\s*[\"']description[\"']|property\\s*=\\s*[\"']og:(?:title|description|type|url)[\"']))[^>]*>");
     private static final Pattern ROOT_PATTERN = Pattern.compile("(?is)<div\\s+id=[\"']root[\"']\\s*>\\s*</div>");
     private static final Pattern MARKDOWN_IMAGE_PATTERN = Pattern.compile("!\\[([^\\]]*)]\\(([^\\s)]+)(?:\\s+[^)]*)?\\)");
     private static final Pattern MARKDOWN_LINK_PATTERN = Pattern.compile("(?<!!)\\[([^\\]]+)]\\(([^\\s)]+)(?:\\s+[^)]*)?\\)");
@@ -40,14 +41,13 @@ public class SeoHtmlService {
 
     public String renderArticlePage(ArticleDto article, String canonicalUrl) {
         String title = buildSeoTitle(article);
-        String description = buildDescription(article.getContent());
+        String description = article.getDescription();
         String articleHtml = buildArticleHtml(article);
         String indexHtml = readIndexHtml();
 
         String html = TITLE_PATTERN.matcher(indexHtml)
                 .replaceFirst(Matcher.quoteReplacement("<title>" + escapeHtml(title + " - " + safeSiteName()) + "</title>"));
-        html = DESCRIPTION_PATTERN.matcher(html)
-                .replaceFirst(Matcher.quoteReplacement("<meta name=\"description\" content=\"" + escapeHtmlAttribute(description) + "\" />"));
+        html = ARTICLE_META_PATTERN.matcher(html).replaceAll("");
 
         String headExtras = buildHeadExtras(article, title, description, canonicalUrl);
         html = html.replace("</head>", headExtras + "\n  </head>");
@@ -103,6 +103,7 @@ public class SeoHtmlService {
         );
 
         return """
+                <meta name="description" content="%s" />
                 <link rel="canonical" href="%s" />
                 <meta property="og:title" content="%s - %s" />
                 <meta property="og:description" content="%s" />
@@ -110,6 +111,7 @@ public class SeoHtmlService {
                 <meta property="og:url" content="%s" />
                 <script type="application/ld+json">%s</script>
                 """.formatted(
+                escapeHtmlAttribute(description),
                 escapeHtmlAttribute(canonicalUrl),
                 escapeHtmlAttribute(title),
                 escapeHtmlAttribute(safeSiteName()),
@@ -212,24 +214,6 @@ public class SeoHtmlService {
         escaped = MARKDOWN_LINK_PATTERN.matcher(escaped)
                 .replaceAll(match -> "<a href=\"" + escapeHtmlAttribute(match.group(2)) + "\">" + match.group(1) + "</a>");
         return escaped;
-    }
-
-    private String buildDescription(String content) {
-        if (content == null || content.isBlank()) {
-            return safeSiteName() + "文章";
-        }
-        String plain = content
-                .replaceAll("(?s)<!--.*?-->", " ")
-                .replaceAll("(?s)```.*?```", " ")
-                .replaceAll("!\\[[^\\]]*]\\([^)]*\\)", " ")
-                .replaceAll("\\[[^\\]]+]\\(([^)]*)\\)", " ")
-                .replaceAll("[#>*_`~\\-]+", " ")
-                .replaceAll("\\s+", " ")
-                .trim();
-        if (plain.isBlank()) {
-            return safeSiteName() + "文章";
-        }
-        return plain.length() > 160 ? plain.substring(0, 160) : plain;
     }
 
     private String safeTitle(ArticleDto article) {

@@ -1,6 +1,8 @@
 package com.blog.myblog.dto;
 
 import lombok.Data;
+import com.blog.myblog.util.ArticleSummary;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.time.LocalDateTime;
 
@@ -17,4 +19,9 @@ public class ArticleDto {
     private Boolean isServerManaged;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    public String getDescription() {
+        return ArticleSummary.fromMarkdown(content);
+    }
 }
