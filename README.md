@@ -276,6 +276,19 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
+#### 6. 配置 TLS 证书自动续签
+
+生产环境使用 Certbot 的 HTTP-01 校验时，Nginx 的 80 端口必须为 `/.well-known/acme-challenge/` 保留一个不跳转 HTTPS 的静态目录，例如：
+
+```nginx
+location ^~ /.well-known/acme-challenge/ {
+    root /opt/myblog/acme-challenge;
+    default_type text/plain;
+}
+```
+
+申请成功后，HTTPS 站点应引用 Certbot 生成的 `fullchain.pem` 和 `privkey.pem`。启用 `certbot-renew.timer`，并在 `/etc/letsencrypt/renewal-hooks/deploy/` 添加重载 Nginx 的可执行钩子；Certbot 只有在证书实际续签成功后才会调用该钩子。可用 `certbot renew --dry-run` 定期验证续签链路。
+
 ### 启动项目
 
 #### 启动后端

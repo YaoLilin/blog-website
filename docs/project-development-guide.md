@@ -13,6 +13,10 @@
 - 部署：Nginx 承载前端静态文件，并反向代理 `/api` 到后端。
 - 内容来源：数据库内容 + 服务器文档目录 `docs` + 静态资源目录 `static/images`、`static/attachments`。
 
+### 1.1 TLS 证书续签
+
+生产站点使用 Certbot 的 HTTP-01 校验。Nginx 在 80 端口为 `/.well-known/acme-challenge/` 提供静态文件，不重定向到 HTTPS；证书续签定时器启用后，Certbot 会定期检查证书。Nginx 的证书路径使用 Certbot 的 `fullchain.pem` 与 `privkey.pem`，并通过 `renewal-hooks/deploy` 钩子在实际续签成功后执行配置校验和重载。部署或变更站点配置后，使用 `certbot renew --dry-run` 验证续签。
+
 ## 2. 前端架构
 
 ### 2.1 技术栈
