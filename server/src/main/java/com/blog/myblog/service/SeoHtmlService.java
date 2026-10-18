@@ -2,7 +2,6 @@ package com.blog.myblog.service;
 
 import com.blog.myblog.datasource.ReadDb;
 import com.blog.myblog.dto.ArticleDto;
-import com.blog.myblog.dto.CategoryDto;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -13,8 +12,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -40,16 +37,16 @@ public class SeoHtmlService {
     private String siteAuthor;
 
     public String renderArticlePage(ArticleDto article, String canonicalUrl) {
-        String title = buildSeoTitle(article);
+        String title = article.getSeoTitle();
         String description = article.getDescription();
         String articleHtml = buildArticleHtml(article);
         String indexHtml = readIndexHtml();
 
-        String html = TITLE_PATTERN.matcher(indexHtml)
-                .replaceFirst(Matcher.quoteReplacement("<title>" + escapeHtml(title + " - " + safeSiteName()) + "</title>"));
+        String html = TITLE_PATTERN.matcher(indexHtml).replaceAll("");
         html = ARTICLE_META_PATTERN.matcher(html).replaceAll("");
 
         String headExtras = buildHeadExtras(article, title, description, canonicalUrl);
+        headExtras = "<title>" + escapeHtml(title + " - " + safeSiteName()) + "</title>\n" + headExtras;
         html = html.replace("</head>", headExtras + "\n  </head>");
 
         String root = "<div id=\"root\">\n" + articleHtml + "\n    </div>";
@@ -133,11 +130,11 @@ public class SeoHtmlService {
                     </main>""".formatted(
                 escapeHtml(safeTitle(article)),
                 published.isBlank() ? escapeHtml(safeSiteName()) : "发布于 " + escapeHtml(published),
-                renderMarkdown(article.getContent())
+                renderMarkdown(article.getContent(), safeTitle(article))
         );
     }
 
-    private String renderMarkdown(String markdown) {
+    private String renderMarkdown(String markdown, String articleTitle) {
         if (markdown == null || markdown.isBlank()) {
             return "";
         }
@@ -146,11 +143,12 @@ public class SeoHtmlService {
         StringBuilder paragraph = new StringBuilder();
         boolean inCodeBlock = false;
         StringBuilder code = new StringBuilder();
+        String imageContext = articleTitle;
 
         for (String rawLine : markdown.replace("\r\n", "\n").split("\n")) {
             String line = rawLine.stripTrailing();
             if (line.startsWith("```") || line.startsWith("~~~")) {
-                flushParagraph(html, paragraph);
+                flushParagraph(html, paragraph, imageContext);
                 if (inCodeBlock) {
                     html.append("<pre><code>").append(escapeHtml(code.toString())).append("</code></pre>\n");
                     code.setLength(0);
@@ -165,24 +163,25 @@ public class SeoHtmlService {
                 continue;
             }
             if (line.isBlank()) {
-                flushParagraph(html, paragraph);
+                flushParagraph(html, paragraph, imageContext);
                 continue;
             }
 
             Matcher heading = Pattern.compile("^(#{1,6})\\s+(.+)$").matcher(line);
             if (heading.matches()) {
-                flushParagraph(html, paragraph);
+                flushParagraph(html, paragraph, imageContext);
                 int level = heading.group(1).length();
+                imageContext = heading.group(2).replaceAll("[*_`]", "").trim();
                 html.append("<h").append(level).append(">")
-                        .append(renderInlineMarkdown(heading.group(2)))
+                        .append(renderInlineMarkdown(heading.group(2), imageContext))
                         .append("</h").append(level).append(">\n");
                 continue;
             }
 
             Matcher unordered = Pattern.compile("^[-*+]\\s+(.+)$").matcher(line);
             if (unordered.matches()) {
-                flushParagraph(html, paragraph);
-                html.append("<ul><li>").append(renderInlineMarkdown(unordered.group(1))).append("</li></ul>\n");
+                flushParagraph(html, paragraph, imageContext);
+                html.append("<ul><li>").append(renderInlineMarkdown(unordered.group(1), imageContext)).append("</li></ul>\n");
                 continue;
             }
 
@@ -195,22 +194,24 @@ public class SeoHtmlService {
         if (inCodeBlock) {
             html.append("<pre><code>").append(escapeHtml(code.toString())).append("</code></pre>\n");
         }
-        flushParagraph(html, paragraph);
+        flushParagraph(html, paragraph, imageContext);
         return html.toString();
     }
 
-    private void flushParagraph(StringBuilder html, StringBuilder paragraph) {
+    private void flushParagraph(StringBuilder html, StringBuilder paragraph, String imageContext) {
         if (paragraph.isEmpty()) {
             return;
         }
-        html.append("<p>").append(renderInlineMarkdown(paragraph.toString())).append("</p>\n");
+        html.append("<p>").append(renderInlineMarkdown(paragraph.toString(), imageContext)).append("</p>\n");
         paragraph.setLength(0);
     }
 
-    private String renderInlineMarkdown(String text) {
+    private String renderInlineMarkdown(String text, String imageContext) {
         String escaped = escapeHtml(text);
         escaped = MARKDOWN_IMAGE_PATTERN.matcher(escaped)
-                .replaceAll(match -> "<img src=\"" + escapeHtmlAttribute(match.group(2)) + "\" alt=\"" + escapeHtmlAttribute(match.group(1)) + "\" loading=\"lazy\" />");
+                .replaceAll(match -> "<img src=\"" + escapeHtmlAttribute(match.group(2)) + "\" alt=\""
+                        + (match.group(1).isBlank() ? escapeHtmlAttribute(imageContext + "配图") : match.group(1))
+                        + "\" loading=\"lazy\" />");
         escaped = MARKDOWN_LINK_PATTERN.matcher(escaped)
                 .replaceAll(match -> "<a href=\"" + escapeHtmlAttribute(match.group(2)) + "\">" + match.group(1) + "</a>");
         return escaped;
@@ -218,29 +219,6 @@ public class SeoHtmlService {
 
     private String safeTitle(ArticleDto article) {
         return article.getTitle() == null || article.getTitle().isBlank() ? "文章" : article.getTitle().trim();
-    }
-
-    private String buildSeoTitle(ArticleDto article) {
-        List<String> parts = new ArrayList<>();
-        CategoryDto category = article.getCategory();
-        if (category != null) {
-            if (category.getFilePath() != null && !category.getFilePath().isBlank()) {
-                for (String segment : category.getFilePath().split("/")) {
-                    String trimmed = segment == null ? "" : segment.trim();
-                    if (!trimmed.isBlank()) {
-                        parts.add(trimmed);
-                    }
-                }
-            } else if (category.getName() != null && !category.getName().isBlank()) {
-                parts.add(category.getName().trim());
-            }
-        }
-
-        String articleTitle = safeTitle(article);
-        if (parts.isEmpty() || !articleTitle.equals(parts.get(parts.size() - 1))) {
-            parts.add(articleTitle);
-        }
-        return String.join(" > ", parts);
     }
 
     public String canonicalForArticle(String baseUrl, Long id) {

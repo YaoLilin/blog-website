@@ -21,12 +21,36 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FileWatcherServiceTest {
 
     @TempDir
     private Path tempDir;
+
+    @Test
+    void disabledWatcherDoesNotScanReceivedReplicaFiles() throws Exception {
+        Files.writeString(tempDir.resolve("replicated.md"), "# Replicated article");
+        ArticleRepository articles = (ArticleRepository) Proxy.newProxyInstance(
+                ArticleRepository.class.getClassLoader(), new Class<?>[]{ArticleRepository.class},
+                (proxy, method, args) -> { throw new AssertionError("Disabled watcher accessed articles"); });
+        CategoryRepository categories = (CategoryRepository) Proxy.newProxyInstance(
+                CategoryRepository.class.getClassLoader(), new Class<?>[]{CategoryRepository.class},
+                (proxy, method, args) -> { throw new AssertionError("Disabled watcher accessed categories"); });
+        FileWatcherService service = new FileWatcherService(articles, categories);
+        ReflectionTestUtils.setField(service, "docsPath", tempDir.toString());
+        ReflectionTestUtils.setField(service, "watchEnabled", false);
+
+        try {
+            service.start();
+
+            assertNull(ReflectionTestUtils.getField(service, "watchService"));
+            assertNull(ReflectionTestUtils.getField(service, "executor"));
+        } finally {
+            service.stop();
+        }
+    }
 
     @Test
     void syncFileWithCategoryPreservesExistingDatabaseTitle() throws Exception {

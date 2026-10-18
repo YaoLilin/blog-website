@@ -4,7 +4,7 @@ import './index.css'
 import App from './App.tsx'
 import { SITE_CONFIG } from './config/site'
 
-document.title = SITE_CONFIG.name
+if (!document.title.trim()) document.title = SITE_CONFIG.name
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

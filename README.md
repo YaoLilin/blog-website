@@ -232,6 +232,7 @@ logging:
 文件路径配置说明：
 
 - `app.docs.path`：服务器管理文档根目录。Git 同步和文件监听会从此目录创建、更新分类和 Markdown 文章；其中的文件可通过 `/api/docs-static/**` 和 `/docs-static/**` 访问。
+- `app.docs.watch.enabled`：默认 `true`，启用启动扫描和文档文件监听。仅接收文件副本的节点设为 `false`，避免接收同步文件时再次修改数据库；手动同步接口不受此开关影响。
 - `app.image.storage.path`：后台上传图片的存储目录。上传后返回 `/api/static/images/**` 地址；服务器管理文章保存时，会将其中引用的图片迁移到对应文档目录。
 - `app.attachment.storage.path`：后台上传附件的存储目录。上传后返回 `/api/static/attachments/**` 地址；服务器管理文章保存时，会将其中引用的附件迁移到对应文档目录。
 - `app.frontend.dist.path`：前端 `npm run build` 生成的 `dist` 目录。Nginx 用它作为网站静态根目录；后端生成 SEO 文章页时读取其中的 `index.html` 和 React 入口脚本，IndexNow key 文件也会写入此目录。生产环境默认使用 `/opt/myblog/dist`，可用环境变量 `APP_FRONTEND_DIST_PATH` 覆盖。
@@ -415,10 +416,12 @@ logging:
 
 如果部署的是单机版博客，没有单独的从库，可以让 `app.datasource.master` 和 `app.datasource.replica` 指向同一个数据库。
 
-如果部署的是“国内主库 + 国外从库”：
+如果部署的是主库与只读副本：
 
-- 国内节点：`master`、`replica` 都可以指向国内数据库，或后续再拆分
-- 国外节点：`master` 指向国内主库，`replica` 指向国外本地 MariaDB 从库
+- 主节点：`master`、`replica` 可指向主数据库。
+- 副本节点：`master` 指向主数据库连接，`replica` 指向本地从库，并使用仅有 `SELECT` 权限的账号；`app.docs.watch.enabled=false`。
+- 文档、图片和附件由主节点通过 lsyncd/rsync 单向同步到副本节点，启动时必须执行初始同步，保留相同目录路径。同步排除 `.git/`、`.DS_Store` 和 `._*`；lsyncd 的 rsync 参数禁止使用 `--delete-excluded`，避免增量同步删除未参与本次变更的文件。
+- 数据库通过复制同步；验收必须检查复制接收和执行线程均正常、无复制错误，并核对文章数量和文件差异，不能只检查 HTTP 200。
 
 #### 1. 构建前端
 

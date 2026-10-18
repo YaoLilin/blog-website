@@ -23,7 +23,7 @@ class SeoHtmlServiceTest {
     @Test
     void articleApiAndSeoHtmlShareOneSummaryWithoutDuplicateMeta() throws Exception {
         Files.writeString(tempDir.resolve("index.html"), """
-                <html><head><title>博客</title>
+                <html><head><title>博客</title><title>旧标题</title><title>博客</title>
                 <meta name="description" content="旧摘要" />
                 <meta content="另一条旧摘要" name="description" />
                 <meta property="og:description" content="个人博客" />
@@ -45,6 +45,8 @@ class SeoHtmlServiceTest {
         assertTrue(summary.contains("e10-cli"));
         assertTrue(!summary.contains("秘密代码") && !summary.contains("隐藏"));
         String html = service.renderArticlePage(article, "https://example.com/articles/75");
+        assertEquals(1, Pattern.compile("<title>").matcher(html).results().count());
+        assertTrue(html.contains("<title>" + article.getSeoTitle() + " - 个人博客</title>"));
         assertTrue(html.contains("<meta name=\"description\" content=\"" + summary + "\" />"));
         assertTrue(html.contains("<meta property=\"og:description\" content=\"" + summary + "\" />"));
         assertTrue(html.contains("\"description\": \"" + summary + "\""));
@@ -54,6 +56,20 @@ class SeoHtmlServiceTest {
         }
         ArticleDto input = mapper.readValue("{\"content\":\"真实正文\",\"description\":\"伪造摘要\"}", ArticleDto.class);
         assertEquals("真实正文", input.getDescription());
+    }
+
+    @Test
+    void markdownImagesKeepExistingAltAndUseHeadingOrArticleTitleForEmptyAlt() {
+        SeoHtmlService service = new SeoHtmlService();
+        ReflectionTestUtils.setField(service, "frontendDistPath", tempDir.resolve("missing").toString());
+        ArticleDto article = article("开发指南");
+        article.setContent("![](/cover.png)\n\n## 环境搭建\n\n![](/empty.png)\n"
+                + "![已有说明](/named.png)\n\n# 接口调试\n\n![  ](/space.png)");
+        String html = service.renderArticlePage(article, "https://example.com/articles/75");
+        assertTrue(html.contains("src=\"/cover.png\" alt=\"开发指南配图\""));
+        assertTrue(html.contains("src=\"/empty.png\" alt=\"环境搭建配图\""));
+        assertTrue(html.contains("src=\"/named.png\" alt=\"已有说明\""));
+        assertTrue(html.contains("src=\"/space.png\" alt=\"接口调试配图\""));
     }
 
     @Test

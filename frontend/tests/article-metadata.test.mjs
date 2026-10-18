@@ -9,7 +9,8 @@ test('article metadata stays unique across server HTML and client navigation', a
   const dist = resolve('dist')
   const shell = await readFile(resolve(dist, 'index.html'), 'utf8')
   const articles = [152, 153].map(id => ({
-    id, title: `测试文章${id}`, content: `## 正文\n文章${id}的正文摘要。`,
+    id, title: `测试文章${id}`, seoTitle: `测试分类 > 测试文章${id}`,
+    content: `## 开发环境\n文章${id}的正文摘要。\n![](/empty.png)\n![已有说明](/named.png)`,
     description: `文章${id}的正文摘要。`.repeat(15).slice(0, 160),
     categoryId: 1, viewCount: 0, isRecommended: false, isServerManaged: false,
     createdAt: '2026-10-12T12:00:00', updatedAt: '2026-10-12T12:00:00',
@@ -51,6 +52,11 @@ test('article metadata stays unique across server HTML and client navigation', a
         const tags = document.head.querySelectorAll('meta[name="description"]')
         return tags.length === 1 && tags[0].content === description
       }, article.description)
+      const titles = await page.locator('head title').allTextContents()
+      assert.equal(titles.length, 1, '文章页只能有一个 title')
+      assert.equal(titles[0], `${article.seoTitle} - 姚礼林的博客`)
+      assert.equal(await page.locator('img[src="/empty.png"]').getAttribute('alt'), '开发环境配图')
+      assert.equal(await page.locator('img[src="/named.png"]').getAttribute('alt'), '已有说明')
       for (const key of ['description', 'og:description', 'og:title', 'og:type']) {
         const attribute = key === 'description' ? 'name' : 'property'
         const values = await page.locator(`head meta[${attribute}="${key}"]`).evaluateAll(tags => tags.map(tag => tag.content))

@@ -1,6 +1,5 @@
 import { useEffect, useState, useRef, useMemo } from 'react'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
-import { Helmet } from 'react-helmet-async'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
@@ -14,7 +13,6 @@ import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { FeedbackDialog, type FeedbackDialogState } from '../components/feedback-dialog'
 import { VditorEditor } from '../components/VditorEditor'
-import { SITE_CONFIG } from '../config/site'
 import { ArticleMetadata } from '../components/ArticleMetadata'
 
 interface TocItem {
@@ -32,7 +30,7 @@ function slugifyHeading(text: string) {
     .replace(/^-|-$/g, '')
 }
 
-function extractToc(content: string): TocItem[] {
+function extractToc(content: string, minLevel = 2): TocItem[] {
   const lines = content.split('\n')
   const toc: TocItem[] = []
   const counts: Record<string, number> = {}
@@ -44,8 +42,8 @@ function extractToc(content: string): TocItem[] {
       return
     }
     if (inCodeBlock) return
-    const m = line.match(/^(#{2,6})\s+(.+)$/)
-    if (m) {
+    const m = line.match(/^(#{1,6})\s+(.+)$/)
+    if (m && m[1].length >= minLevel) {
       const text = m[2]
       const base = slugifyHeading(text)
       counts[base] = (counts[base] || 0) + 1
@@ -210,11 +208,6 @@ export function ArticlePage() {
   }, [article])
 
   useEffect(() => {
-    if (!article) return
-    document.title = article.title
-  }, [article])
-
-  useEffect(() => {
     if (!article || isAdmin) return
     api.recordView(article.id).catch(() => {})
   }, [article, isAdmin])
@@ -304,6 +297,7 @@ export function ArticlePage() {
 
   // 用源码行号查 id，和 re-render、渲染顺序无关
   const displayContent = useMemo(() => stripMarkdownComments(article?.content ?? ''), [article?.content])
+  const imageHeadings = useMemo(() => extractToc(displayContent, 1), [displayContent])
 
   const tocByLine = useMemo(() => {
     const map = new Map<number, string>()
@@ -346,7 +340,10 @@ export function ArticlePage() {
           </span>
         )
       }
-      return <img src={fixedSrc} alt={alt || ''} loading="lazy" decoding="async" {...props} />
+      const line = (node as MdNode)?.position?.start?.line ?? 0
+      const heading = imageHeadings.filter(item => item.line <= line).pop()?.text.replace(/[*_`]/g, '').trim()
+      const imageAlt = alt?.trim() ? alt : `${heading || article?.title || '文章'}配图`
+      return <img src={fixedSrc} alt={imageAlt} loading="lazy" decoding="async" {...props} />
     },
     a: ({ node: _node, href, children, ...props }: React.ComponentPropsWithRef<'a'> & { node?: unknown }) => {
       const isDocsMarkdown = href?.includes('/docs-static/') && href?.toLowerCase().endsWith('.md')
@@ -378,7 +375,7 @@ export function ArticlePage() {
       return <a href={href} {...props}>{children}</a>
     },
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [tocByLine])
+  }), [tocByLine, imageHeadings, article?.title])
 
   const activeH3 = toc.find(t => t.id === activeLevel3Id && t.level === 3)
   const subTocForActiveH3 = (() => {
@@ -427,9 +424,6 @@ export function ArticlePage() {
 
   return (
     <>
-      <Helmet>
-        <title>{article.title} - {SITE_CONFIG.name}</title>
-      </Helmet>
       <ArticleMetadata article={article} />
       <div className="flex gap-0">
       {/* 左侧：目录 + 分类导航 */}

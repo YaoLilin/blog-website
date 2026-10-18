@@ -142,6 +142,7 @@
 | `app.jwt.expiration` | JWT 有效期 |
 | `app.admin.password` | 管理员密码 BCrypt 哈希 |
 | `app.docs.path` | 文档目录 |
+| `app.docs.watch.enabled` | 默认 `true`；控制启动文档扫描与文件监听。仅接收文件副本的节点设为 `false`；不影响手动同步接口 |
 | `app.image.storage.path` | 图片存储目录 |
 | `app.attachment.storage.path` | 附件存储目录 |
 | `app.frontend.dist.path` | 前端构建目录；默认由 `APP_FRONTEND_DIST_PATH` 覆盖或使用生产路径 `/opt/myblog/dist`，SEO HTML 会从此目录读取 React 入口 |
@@ -503,6 +504,14 @@ Git 管理页由 `GitPage` 实现，主要功能：
 - 文件监听创建服务器管理分类时，会根据上级目录 `file_path` 解析父分类，保持磁盘目录和分类树层级一致。
 - `/docs-static/**` 暴露文档静态访问。
 
+#### 6.1.1 多节点同步
+
+主节点负责文件扫描入库，副本节点通过数据库复制读取文章，并通过 lsyncd/rsync 接收文档、图片和附件。两端使用相同的绝对目录路径，文件传输排除 `.git/`、`.DS_Store` 和 `._*`；lsyncd 保留初始同步，避免仅同步启动后的变更而遗漏历史文件。禁止配置 `--delete-excluded`：lsyncd 增量同步会用过滤列表限定本次变更文件，该参数会把其余目标文件当作排除项删除。
+
+副本节点设置 `app.docs.watch.enabled=false`，关闭启动扫描与文件监听；写数据源连接主数据库，读数据源使用本地从库的只读账号。该开关不禁止手动同步接口，手动同步仍会操作写数据源。
+
+出现复制错误 `1032` 时，应先备份从库和文件，再以主库一致性快照及对应 binlog 位置重建从库；不要跳过错误事件。恢复后检查复制接收/执行线程、复制延迟、两端文章内容及文件差异，并以临时文件验证新增、修改、删除均可自动同步。
+
 ### 6.2 上传文件
 
 上传入口为 `/api/upload`：
@@ -554,7 +563,9 @@ SEO 由后端和 Nginx 配合：
 - 前端 `ArticlePage`
   - 文章 API 的只读 `description` 字段由 `ArticleSummary` 从正文生成：去除注释、代码块、图片及格式标记，保留链接文字，最多 160 个 Unicode 字符；正文为空时返回无可用摘要提示。
   - 服务端 SEO HTML 的 description、OG description 和 JSON-LD description 均使用同一摘要，输出前清除壳页面中的旧 description 和文章 OG 标签。
-  - 运行时 `Helmet` 设置标题，`ArticleMetadata` 复用 API 摘要更新并去重 head 中的 description、OG description、OG title 和 OG type；文章路由不添加全站简介，确保每种标签仅一条。离开文章页时清理这些标签。
+  - 文章 API 的只读 `seoTitle` 字段由分类完整路径和文章标题组成；服务端和前端统一附加站点名称，作为文章 title 和 OG title。服务端清除壳页面旧 title 后只输出一条；前端入口保留已有标题，文章路由不再插入全站或短标题。
+  - `ArticleMetadata` 复用 API 标题和摘要，更新并去重 head 中的 title、description、OG description、OG title 和 OG type，确保每种标签仅一条。离开文章页时清理文章 meta 标签。
+  - 文章正文图片保留已有非空 Alt；Markdown 图片 Alt 为空时，服务端及前端使用所属章节名称加“配图”兜底，无章节时使用文章标题。装饰性图标仍可使用空 Alt；渲染兜底不修改原始 Markdown 文件。
 
 ### 7.3 IndexNow 机制
 

@@ -57,7 +57,7 @@ function PublicLayout() {
   return (
     <>
       <Helmet>
-        <title>{SITE_CONFIG.name}</title>
+        {!location.pathname.startsWith('/articles/') && <title>{SITE_CONFIG.name}</title>}
         {!location.pathname.startsWith('/articles/') && <meta name="description" content={SITE_CONFIG.description} />}
       </Helmet>
       <div className="min-h-screen bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-50 flex flex-col">

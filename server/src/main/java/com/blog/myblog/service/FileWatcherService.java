@@ -39,6 +39,9 @@ public class FileWatcherService {
     @Value("${app.docs.path}")
     private String docsPath;
 
+    @Value("${app.docs.watch.enabled:true}")
+    private boolean watchEnabled = true;
+
     private final ArticleRepository articleRepository;
     private final CategoryRepository categoryRepository;
 
@@ -47,6 +50,10 @@ public class FileWatcherService {
 
     @PostConstruct
     public void start() {
+        if (!watchEnabled) {
+            log.info("文档文件监听和启动扫描已关闭: {}", docsPath);
+            return;
+        }
         File docsDir = new File(docsPath);
         if (!docsDir.exists()) {
             log.info("文档目录不存在，文件监听未启动: {}", docsPath);

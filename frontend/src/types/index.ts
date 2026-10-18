@@ -14,6 +14,7 @@ export interface Article {
   title: string
   content: string
   description: string
+  seoTitle: string
   categoryId: number
   filePath?: string | null
   category?: Category
