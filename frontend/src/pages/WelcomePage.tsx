@@ -112,9 +112,9 @@ export function WelcomePage() {
       </div>
 
       <div className="container mx-auto px-3 max-w-5xl mb-12 mt-10">
-        <header className="mb-8">
-          <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">{SITE_CONFIG.homeHeading}</h1>
-          <p className="mt-3 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">{SITE_CONFIG.introduction}</p>
+        <header id="site-introduction" hidden>
+          <h1>{SITE_CONFIG.homeHeading}</h1>
+          <p>{SITE_CONFIG.introduction}</p>
         </header>
         <div className="relative overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
           <div className="flex items-center justify-between px-5 py-5 md:px-7 md:py-7">

@@ -207,7 +207,7 @@ app:
     author-alias: AuthorAlias
     description: 网站的简短描述，用于首页 description 和 OG description
     home-title: 首页 SEO 标题
-    introduction: 首页正文中的作者身份与网站介绍
+    introduction: 网站身份介绍，保留在 HTML 中但默认隐藏
     base-url: https://your-domain.com
   index-now:
     enabled: false
@@ -235,9 +235,9 @@ logging:
       total-size-cap: 1GB
 ```
 
-前端站点配置集中在 `frontend/src/config/site.ts`：`author`、`authorAlias` 为作者身份；`name`、`homeHeading`、`homeTitle` 为站点名称、首页正文标题和 SEO 标题；`description` 为网站摘要；`introduction` 为首页正文介绍；`homeUrl` 为首页规范网址。`index.html` 使用 `%SITE_AUTHOR%`、`%SITE_DESCRIPTION%`、`%SITE_TITLE%` 占位符，Vite 在开发请求和构建时读取同一配置并进行 HTML 转义。修改配置后，生产环境需要重新构建前端。
+前端站点配置集中在 `frontend/src/config/site.ts`：`author`、`authorAlias` 为作者身份；`name`、`homeHeading`、`homeTitle` 为站点名称、介绍区块标题和 SEO 标题；`description` 为网站摘要；`introduction` 为网站介绍；`homeUrl` 为首页规范网址。`index.html` 使用 `%SITE_AUTHOR%`、`%SITE_DESCRIPTION%`、`%SITE_TITLE%` 占位符，Vite 在开发请求和构建时读取同一配置并进行 HTML 转义。修改配置后，生产环境需要重新构建前端。
 
-后端首页与文章 SEO 的作者使用 `app.site.author`；首页额外读取 `app.site.author-alias`、`app.site.description`、`app.site.home-title`、`app.site.introduction`。首页 canonical 和 OG URL 由 `app.site.base-url` 生成，末尾规范为单个 `/`。文章摘要仍来自各篇正文，不使用网站通用描述替代。
+首页标题和身份介绍保留在 DOM 与服务端原始 HTML 的 `header#site-introduction` 中，使用原生 `hidden` 属性隐藏，不占布局空间。后端首页与文章 SEO 的作者使用 `app.site.author`；首页额外读取 `app.site.author-alias`、`app.site.description`、`app.site.home-title`、`app.site.introduction`。首页 canonical 和 OG URL 由 `app.site.base-url` 生成，末尾规范为单个 `/`。文章摘要仍来自各篇正文，不使用网站通用描述替代。
 
 前后端配置独立，作者、描述与规范域名应保持一致。使用外部 `application.properties` / `application.yml` 启动时，将对应 `app.site.*` 项写入该外部文件；仅修改源码中的 `application.yml` 不会覆盖已指定的外部配置。外部配置修改后重启后端。
 
@@ -434,6 +434,7 @@ logging:
 - 副本节点：`master` 指向主数据库连接，`replica` 指向本地从库，并使用仅有 `SELECT` 权限的账号；`app.docs.watch.enabled=false`。
 - 文档、图片和附件由主节点通过 lsyncd/rsync 单向同步到副本节点，启动时必须执行初始同步，保留相同目录路径。同步排除 `.git/`、`.DS_Store` 和 `._*`；lsyncd 的 rsync 参数禁止使用 `--delete-excluded`，避免增量同步删除未参与本次变更的文件。
 - 数据库通过复制同步；验收必须检查复制接收和执行线程均正常、无复制错误，并核对文章数量和文件差异，不能只检查 HTTP 200。
+- 共享数据库服务器上的博客从库必须限定复制范围，例如 MariaDB 在 `[mysqld]` 中设置 `replicate-wild-do-table=blog_db.%`；否则其他项目的表事件可能因目标表不存在而中断博客复制。该过滤项须持久化到数据库配置文件。
 
 #### 1. 构建前端
 

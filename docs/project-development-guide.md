@@ -151,10 +151,10 @@
 | `app.site.base-url` | 站点对外公开访问地址，用于 sitemap、canonical、IndexNow |
 | `app.site.name` | 站点名称，用于 SEO 标题 |
 | `app.site.author` | 首页和文章的 author meta、文章 JSON-LD 作者 |
-| `app.site.author-alias` | 首页作者英文身份，与站点名称组合为正文主标题 |
+| `app.site.author-alias` | 隐藏介绍区块中的作者英文身份 |
+| `app.site.introduction` | 隐藏介绍区块中的网站介绍，未配置时使用网站描述 |
 | `app.site.description` | 首页 description 和 OG description |
 | `app.site.home-title` | 首页 title 和 OG title；未配置时使用站点名称 |
-| `app.site.introduction` | 首页正文身份介绍；未配置时使用网站描述 |
 | `app.index-now.enabled` | 是否启用 IndexNow |
 | `app.index-now.key` | IndexNow key |
 | `app.index-now.endpoint` | IndexNow 提交地址，默认 Bing |
@@ -514,6 +514,8 @@ Git 管理页由 `GitPage` 实现，主要功能：
 
 副本节点设置 `app.docs.watch.enabled=false`，关闭启动扫描与文件监听；写数据源连接主数据库，读数据源使用本地从库的只读账号。该开关不禁止手动同步接口，手动同步仍会操作写数据源。
 
+数据库服务器承载多个项目时，博客从库仅复制 `blog_db`。MariaDB 使用 `replicate-wild-do-table=blog_db.%`，同时设置运行时过滤并持久化配置，防止其他项目的缺表事件导致复制执行线程停止。发生 `1146` 错误时先核对错误涉及的库；无关库应修正复制范围，不应导入无关项目的表或直接跳过博客事件。
+
 出现复制错误 `1032` 时，应先备份从库和文件，再以主库一致性快照及对应 binlog 位置重建从库；不要跳过错误事件。恢复后检查复制接收/执行线程、复制延迟、两端文章内容及文件差异，并以临时文件验证新增、修改、删除均可自动同步。
 
 ### 6.2 上传文件
@@ -532,7 +534,7 @@ SEO 由后端和 Nginx 配合：
 - `/api/robots.txt` 生成 robots 文件。
 - `/api/sitemap.xml` 根据分类和文章生成站点地图。
 - `/api/seo/articles/{id}` 按文章 ID 输出 HTML。
-- `/api/seo/home` 输出首页 HTML，使用与前端首页相同的推荐分类、推荐文章和最近 10 篇文章数据；原始响应含 `YaoLilin` / `姚礼林` 身份介绍、可抓取链接和文章摘要，不依赖 JavaScript 才产生正文。
+- `/api/seo/home` 输出首页 HTML，使用与前端首页相同的推荐分类、推荐文章和最近 10 篇文章数据；原始响应含可抓取的分类、文章链接和文章摘要；标题和网站介绍保留在 `header#site-introduction` 中，通过原生 `hidden` 属性隐藏，不依赖 JavaScript 才产生正文。
 - `/api/seo/articles/view?path=...` 按文件路径输出 HTML。
 - Nginx 将 `/robots.txt`、`/sitemap.xml` 和 `/articles/**` 代理到后端 SEO 接口；SEO HTML 必须保留前端入口脚本，使 React 在浏览器加载后接管文章页面。
 - 前端页面使用 `react-helmet-async` 设置标题和描述。
@@ -571,9 +573,10 @@ SEO 由后端和 Nginx 配合：
   - 对 Markdown 做基础服务端渲染，保证搜索引擎在不执行前端脚本时也能读到正文。
   - 首页和文章共用 HTML 壳注入逻辑，注入前清理旧 title、description、OG 和 canonical，避免重复标签；首页动态文本按 HTML 转义。
 - 前端 `WelcomePage` / `HomeMetadata`
-  - 站点作者、英文身份、名称、首页标题、介绍、描述和 canonical 由 `frontend/src/config/site.ts` 配置，`WelcomePage` 不内置身份文案。
+  - 站点作者、英文身份、名称、首页 SEO 标题、介绍、描述和 canonical 由 `frontend/src/config/site.ts` 配置，`WelcomePage` 不内置身份文案。
   - `frontend/index.html` 的作者、描述与标题使用站点配置占位符，由 Vite 在开发请求及构建时转义注入，构建产物中不保留占位符。
-  - 后端首页作者及文案来自 `app.site.*`，不再在 Java 中内置作者或网站描述。外部配置文件启动时，新增配置须写入实际加载的外部文件。
+  - 首页网站标题和作者介绍区块保留在 DOM 与原始 HTML 中；前后端统一使用 `header#site-introduction[hidden]` 隐藏，避免加载时闪现且不占布局空间。品牌标题、作者和网站描述仍在 head 元数据中输出。
+  - 后端首页作者及 SEO 文案来自 `app.site.*`，不再在 Java 中内置作者或网站描述。外部配置文件启动时，新增配置须写入实际加载的外部文件。
   - 浏览器接管后更新并去重首页 description、OG、canonical；离开首页时清理首页专属标签，避免文章页保留首页 canonical。
 - 前端 `ArticlePage`
   - 文章 API 的只读 `description` 字段由 `ArticleSummary` 从正文生成：去除注释、代码块、图片及格式标记，保留链接文字，最多 160 个 Unicode 字符；正文为空时返回无可用摘要提示。

@@ -81,7 +81,7 @@ public class SeoHtmlService {
                 <meta property="og:url" content="%s" />
                 """.formatted(escapeHtml(title), escapeHtmlAttribute(safeSiteAuthor()), escapeHtmlAttribute(description),
                 escapeHtmlAttribute(url), escapeHtmlAttribute(title), escapeHtmlAttribute(description), escapeHtmlAttribute(url));
-        StringBuilder body = new StringBuilder("<main><header><h1>")
+        StringBuilder body = new StringBuilder("<main><header id=\"site-introduction\" hidden><h1>")
                 .append(escapeHtml(heading)).append("</h1><p>")
                 .append(escapeHtml(introduction))
                 .append("</p></header><nav><a href=\"/categories\">文章分类</a> · ")

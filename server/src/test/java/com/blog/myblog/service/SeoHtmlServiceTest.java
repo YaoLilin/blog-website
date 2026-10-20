@@ -45,7 +45,7 @@ class SeoHtmlServiceTest {
 
         String html = service.renderHomePage(new HomeSeoDto(List.of(category), List.of(article), List.of(article)));
 
-        assertTrue(html.contains("<h1>YaoLilin · 姚礼林的博客</h1>"));
+        assertTrue(html.contains("<header id=\"site-introduction\" hidden><h1>YaoLilin · 姚礼林的博客</h1>"));
         assertTrue(html.contains("我是姚礼林（YaoLilin）"));
         assertTrue(html.contains("href=\"/articles/73\""));
         assertTrue(html.contains("href=\"/categories/7\""));
@@ -82,8 +82,9 @@ class SeoHtmlServiceTest {
         assertTrue(html.contains("<title>自定义首页标题</title>"));
         assertTrue(html.contains("name=\"author\" content=\"新作者&quot; &amp; 测试\""));
         assertTrue(html.contains("name=\"description\" content=\"配置的网站描述 &lt;安全&gt;\""));
-        assertTrue(html.contains("<h1>NewAuthor · 配置站点</h1>"));
-        assertTrue(html.contains("可配置的作者介绍"));
+        String body = html.substring(html.indexOf("<body>"));
+        assertTrue(body.contains("<header id=\"site-introduction\" hidden><h1>NewAuthor · 配置站点</h1>"));
+        assertTrue(body.contains("可配置的作者介绍"));
         assertTrue(html.contains("href=\"https://configured.example/\""));
         assertTrue(!html.contains("姚礼林") && !html.contains("YaoLilin"));
 
