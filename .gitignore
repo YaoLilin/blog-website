@@ -48,3 +48,6 @@ scripts
 docs/server-config.md
 deploy.exp
 check-server.exp
+
+.log
+**/log

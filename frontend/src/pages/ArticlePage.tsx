@@ -4,7 +4,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
 import rehypeHighlight from 'rehype-highlight'
-import { Calendar, RefreshCw, Eye, Edit, Save, X, ChevronRight, PanelLeftClose, PanelLeftOpen, FileText } from 'lucide-react'
+import { Calendar, RefreshCw, Eye, Edit, Save, X, ChevronRight, PanelLeftClose, PanelLeftOpen, FileText, Search } from 'lucide-react'
 import { api } from '../api'
 import type { Article, Category } from '../types'
 import { useAuthStore } from '../stores/authStore'
@@ -14,6 +14,9 @@ import { Input } from '../components/ui/input'
 import { FeedbackDialog, type FeedbackDialogState } from '../components/feedback-dialog'
 import { VditorEditor } from '../components/VditorEditor'
 import { ArticleMetadata } from '../components/ArticleMetadata'
+import { getArticleSearch, rehypeSearchHighlights } from '../lib/searchSnippet'
+import { useArticleSearchNavigation } from '../hooks/useArticleSearchNavigation'
+import { ArticleSearchBar } from '../components/ArticleSearchBar'
 
 interface TocItem {
   id: string
@@ -111,7 +114,7 @@ function getFileNameFromUrl(url?: string) {
 
 export function ArticlePage() {
   const { id } = useParams<{ id: string }>()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { isAdmin } = useAuthStore()
   const [article, setArticle] = useState<Article | null>(null)
   const [breadcrumb, setBreadcrumb] = useState<Category[]>([])
@@ -128,11 +131,33 @@ export function ArticlePage() {
   const [feedback, setFeedback] = useState<FeedbackDialogState | null>(null)
   const contentRef = useRef<HTMLDivElement>(null)
   const articleHeaderRef = useRef<HTMLDivElement>(null)
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  const searchButtonRef = useRef<HTMLButtonElement>(null)
+  const [searchVisibility, setSearchVisibility] = useState<{ scope: string; open: boolean } | null>(null)
+  const [searchRevision, setSearchRevision] = useState(0)
   // 点击目录后的"静默期"，期间忽略 IntersectionObserver 的高亮更新
   const suppressObserverUntilRef = useRef<number>(0)
   const editOpenedByQueryRef = useRef(false)
 
   const docsPath = searchParams.get('path')
+  const searchKeyword = searchParams.get('highlight') ?? ''
+  const searchCount = useMemo(() => getArticleSearch(article?.content, searchKeyword).count, [article?.content, searchKeyword])
+  const requestedMatch = Number(searchParams.get('match') ?? 0)
+  const searchMatch = Number.isSafeInteger(requestedMatch) && requestedMatch >= 0 && requestedMatch < searchCount ? requestedMatch : 0
+  const searchScope = JSON.stringify([id, docsPath, searchKeyword])
+  const searchOpen = searchVisibility?.scope === searchScope ? searchVisibility.open : !!searchKeyword.trim()
+  const updateArticleSearch = (keyword: string, match: number) => {
+    const params = new URLSearchParams(searchParams)
+    if (keyword) { params.set('highlight', keyword); params.set('match', String(match)) }
+    else { params.delete('highlight'); params.delete('match') }
+    setSearchVisibility({ scope: JSON.stringify([id, docsPath, keyword]), open: true })
+    setSearchParams(params, { replace: true, preventScrollReset: true })
+    setSearchRevision(revision => revision + 1)
+  }
+  useArticleSearchNavigation({
+    contentRef, headerRef: articleHeaderRef, ready: !loading && !!article && !editMode && searchOpen,
+    keyword: searchKeyword, matchIndex: searchMatch, revision: searchRevision,
+  })
 
   const activeTocId = useMemo(() => {
     if (!activeId) return ''
@@ -524,7 +549,8 @@ export function ArticlePage() {
             </div>
           ) : (
             <>
-              <h1 className="text-2xl font-bold mb-3 flex items-center gap-2">
+              <div className="flex items-start gap-2 mb-3">
+              <h1 className="text-2xl font-bold flex flex-1 min-w-0 items-center gap-2 break-words">
                 {article.title}
                 {gitRemoteUrl && (
                   <a href={gitRemoteUrl} target="_blank" rel="noopener noreferrer" className="inline-flex text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors" title="查看仓库">
@@ -532,6 +558,14 @@ export function ArticlePage() {
                   </a>
                 )}
               </h1>
+              {!searchOpen && (
+                <Button ref={searchButtonRef} type="button" variant="ghost" size="icon-sm" aria-label="打开文章内搜索" title="文章内搜索"
+                  onClick={() => {
+                    setSearchVisibility({ scope: searchScope, open: true })
+                    requestAnimationFrame(() => { searchInputRef.current?.focus(); searchInputRef.current?.select() })
+                  }}><Search /></Button>
+              )}
+              </div>
               <div className="flex items-center gap-4 text-sm text-zinc-500 dark:text-zinc-400">
                 <span className="flex items-center gap-1"><Calendar size={14} />{formatDate(article.createdAt)}</span>
                 {article.updatedAt !== article.createdAt && (
@@ -539,6 +573,16 @@ export function ArticlePage() {
                 )}
                 {isAdmin && <span className="flex items-center gap-1"><Eye size={14} />{article.viewCount} 次阅读</span>}
               </div>
+              {searchOpen && (
+                <ArticleSearchBar key={JSON.stringify([id, docsPath])} inputRef={searchInputRef}
+                  search={{ keyword: searchKeyword, index: searchMatch, count: searchCount }}
+                  onSearch={keyword => updateArticleSearch(keyword, 0)}
+                  onMove={direction => { if (searchCount) updateArticleSearch(searchKeyword, (searchMatch + direction + searchCount) % searchCount) }}
+                  onClose={() => {
+                    setSearchVisibility({ scope: searchScope, open: false })
+                    requestAnimationFrame(() => searchButtonRef.current?.focus({ preventScroll: true }))
+                  }} />
+              )}
             </>
           )}
         </div>
@@ -568,7 +612,7 @@ export function ArticlePage() {
           <div ref={contentRef} className="prose dark:prose-invert prose-sm max-w-none">
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
-              rehypePlugins={[rehypeRaw, rehypeHighlight]}
+              rehypePlugins={[rehypeRaw, rehypeHighlight, [rehypeSearchHighlights, { keyword: searchOpen ? searchKeyword : '', selectedMatch: searchMatch }]]}
               urlTransform={transformMarkdownUrl}
               components={markdownComponents}
             >

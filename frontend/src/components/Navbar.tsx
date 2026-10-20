@@ -2,8 +2,7 @@ import { Moon, Search, Settings, Sun, SunMoon } from 'lucide-react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { api } from '../api'
-import { cn, formatDate } from '../lib/utils'
-import { formatCategoryPath } from '../lib/category'
+import { cn } from '../lib/utils'
 import { useAuthStore } from '../stores/authStore'
 import { useTheme } from '../theme-provider'
 import { isTokenExpired } from '../lib/jwt'
@@ -12,6 +11,7 @@ import { Button } from './ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog'
 import { Input } from './ui/input'
 import { SITE_CONFIG } from '../config/site'
+import { SearchResultCard } from './SearchResultCard'
 
 
 interface CategoryMenuProps {
@@ -56,6 +56,7 @@ export function Navbar() {
   const [searchDialogLoading, setSearchDialogLoading] = useState(false)
   const [searchDialogHasSearched, setSearchDialogHasSearched] = useState(false)
   const [searchDialogResults, setSearchDialogResults] = useState<Article[]>([])
+  const [searchDialogKeyword, setSearchDialogKeyword] = useState('')
   const [searchTitleOnly, setSearchTitleOnly] = useState(false)
   const [showThemeMenu, setShowThemeMenu] = useState(false)
   const articleMenuRef = useRef<HTMLDivElement>(null)
@@ -104,7 +105,7 @@ export function Navbar() {
     }
   }
 
-  const runDialogSearch = async (keyword: string) => {
+  const runDialogSearch = async (keyword: string, titleOnly = searchTitleOnly) => {
     const q = keyword.trim()
     setSearchValue(q)
     if (!q) {
@@ -116,7 +117,8 @@ export function Navbar() {
     setSearchDialogLoading(true)
     setSearchDialogHasSearched(true)
     try {
-      const results = await api.searchArticles(q, searchTitleOnly)
+      const results = await api.searchArticles(q, titleOnly)
+      setSearchDialogKeyword(q)
       setSearchDialogResults(results)
     } catch {
       setSearchDialogResults([])
@@ -371,8 +373,8 @@ export function Navbar() {
           }
         }}
       >
-        <DialogContent className="sm:max-w-2xl">
-          <DialogHeader>
+        <DialogContent className="flex max-h-[85dvh] flex-col sm:max-w-2xl">
+          <DialogHeader className="shrink-0">
             <DialogTitle>搜索文章</DialogTitle>
           </DialogHeader>
           <form
@@ -380,9 +382,9 @@ export function Navbar() {
               e.preventDefault()
               void runDialogSearch(searchValue)
             }}
-            className="space-y-4"
+            className="flex min-h-0 flex-col gap-4"
           >
-            <div className="relative">
+            <div className="relative shrink-0">
               <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
               <Input
                 ref={searchDialogInputRef}
@@ -399,7 +401,7 @@ export function Navbar() {
               </button>
             </div>
 
-            <label className="flex items-center gap-2 text-sm text-zinc-500 select-none">
+            <label className="flex shrink-0 items-center gap-2 text-sm text-zinc-500 select-none">
               <input
                 type="checkbox"
                 checked={searchTitleOnly}
@@ -407,9 +409,7 @@ export function Navbar() {
                   const next = e.target.checked
                   setSearchTitleOnly(next)
                   if (searchDialogHasSearched && searchValue.trim()) {
-                    void api.searchArticles(searchValue.trim(), next)
-                      .then(setSearchDialogResults)
-                      .catch(() => setSearchDialogResults([]))
+                    void runDialogSearch(searchValue, next)
                   }
                 }}
                 className="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-400 dark:border-zinc-700 dark:bg-zinc-900"
@@ -417,7 +417,7 @@ export function Navbar() {
               只搜索文章标题
             </label>
 
-            <div className="max-h-[60vh] overflow-y-auto">
+            <div className="min-h-0 overflow-y-auto overscroll-contain" aria-label="搜索文章结果列表">
               {searchDialogLoading ? (
                 <div className="text-center text-zinc-400 py-12">搜索中...</div>
               ) : searchDialogHasSearched ? (
@@ -426,22 +426,11 @@ export function Navbar() {
                 ) : (
                   <div className="space-y-3">
                     <div className="text-sm text-zinc-500">
-                      搜索"{searchValue}"的结果
+                      搜索"{searchDialogKeyword}"的结果
                       <span className="text-zinc-400 ml-2">({searchDialogResults.length} 篇)</span>
                     </div>
-                    {searchDialogResults.map(a => (
-                      <Link
-                        key={a.id}
-                        to={`/articles/${a.id}`}
-                        onClick={() => setShowSearchDialog(false)}
-                        className="block p-4 rounded-lg border border-zinc-100 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-600 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-all"
-                      >
-                        <h2 className="font-medium mb-1">{a.title}</h2>
-                        <div className="flex items-center gap-3 text-xs text-zinc-400">
-                          {a.category && <span>{formatCategoryPath(categories, a.category.id) || a.category.name}</span>}
-                          <span>{formatDate(a.createdAt)}</span>
-                        </div>
-                      </Link>
+                    {searchDialogResults.map(article => (
+                      <SearchResultCard key={article.id} article={article} keyword={searchDialogKeyword} categories={categories} />
                     ))}
                   </div>
                 )
@@ -450,7 +439,7 @@ export function Navbar() {
               )}
             </div>
           </form>
-          <DialogFooter className="gap-2">
+          <DialogFooter className="shrink-0 gap-2">
             <Button
               type="button"
               variant="outline"

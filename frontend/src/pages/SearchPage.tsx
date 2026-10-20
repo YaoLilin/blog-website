@@ -1,10 +1,9 @@
-import { Link, useLoaderData } from 'react-router-dom'
+import { useLoaderData } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { api } from '../api'
 import type { Article, Category } from '../types'
-import { formatDate } from '../lib/utils'
-import { formatCategoryPath } from '../lib/category'
 import { SITE_CONFIG } from '../config/site'
+import { SearchResultCard } from '../components/SearchResultCard'
 
 export interface SearchLoaderData {
   keyword: string
@@ -44,19 +43,7 @@ export function SearchPage() {
         <div className="text-center text-zinc-400 py-12">没有找到相关文章</div>
       ) : (
         <div className="space-y-3">
-          {results.map(a => (
-            <Link
-              key={a.id}
-              to={`/articles/${a.id}`}
-              className="block p-4 rounded-lg border border-zinc-100 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-600 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-all"
-            >
-              <h2 className="font-medium mb-1">{a.title}</h2>
-              <div className="flex items-center gap-3 text-xs text-zinc-400">
-                {a.category && <span>{formatCategoryPath(categories, a.category.id) || a.category.name}</span>}
-                <span>{formatDate(a.createdAt)}</span>
-              </div>
-            </Link>
-          ))}
+          {results.map(article => <SearchResultCard key={article.id} article={article} keyword={keyword} categories={categories} />)}
         </div>
       )}
     </div>
