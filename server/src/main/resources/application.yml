@@ -41,6 +41,10 @@ app:
   site:
     name: 姚礼林的博客
     author: 姚礼林
+    author-alias: YaoLilin
+    description: 姚礼林（YaoLilin）的个人博客，分享泛微 OA E9、E10 开发、编程、AI 与开源项目经验。
+    home-title: YaoLilin（姚礼林）的博客 - 泛微 E9/E10 开发与技术分享
+    introduction: 我是姚礼林（YaoLilin），分享泛微 OA E9、E10 的前后端二次开发知识、实用案例，以及编程、AI 与开源项目经验。
     base-url: http://localhost:5173
   index-now:
     enabled: false

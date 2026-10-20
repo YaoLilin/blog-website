@@ -39,6 +39,7 @@ public class SecurityConfig {
                 .requestMatchers("/auth/login").permitAll()
                 .requestMatchers(HttpMethod.GET, "/robots.txt", "/sitemap.xml").permitAll()
                 .requestMatchers(HttpMethod.GET, "/seo/articles/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/seo/home").permitAll()
                 .requestMatchers(HttpMethod.GET, "/categories/**", "/articles/**", "/settings/**", "/stats", "/projects/**", "/git/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/articles/*/view", "/stats/visit").permitAll()
                 .requestMatchers(HttpMethod.GET, "/static/**", "/docs-static/**").permitAll()

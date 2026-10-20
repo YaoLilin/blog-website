@@ -202,6 +202,12 @@ app:
   admin:
     password: $2a$10$MqoKK/5vKGk91GKHOB.2wu0D1LT871T8Kae7jWlAybkE9NbpHKHoq
   site:
+    name: 你的博客名称
+    author: 作者姓名
+    author-alias: AuthorAlias
+    description: 网站的简短描述，用于首页 description 和 OG description
+    home-title: 首页 SEO 标题
+    introduction: 首页正文中的作者身份与网站介绍
     base-url: https://your-domain.com
   index-now:
     enabled: false
@@ -228,6 +234,12 @@ logging:
       max-history: 30
       total-size-cap: 1GB
 ```
+
+前端站点配置集中在 `frontend/src/config/site.ts`：`author`、`authorAlias` 为作者身份；`name`、`homeHeading`、`homeTitle` 为站点名称、首页正文标题和 SEO 标题；`description` 为网站摘要；`introduction` 为首页正文介绍；`homeUrl` 为首页规范网址。`index.html` 使用 `%SITE_AUTHOR%`、`%SITE_DESCRIPTION%`、`%SITE_TITLE%` 占位符，Vite 在开发请求和构建时读取同一配置并进行 HTML 转义。修改配置后，生产环境需要重新构建前端。
+
+后端首页与文章 SEO 的作者使用 `app.site.author`；首页额外读取 `app.site.author-alias`、`app.site.description`、`app.site.home-title`、`app.site.introduction`。首页 canonical 和 OG URL 由 `app.site.base-url` 生成，末尾规范为单个 `/`。文章摘要仍来自各篇正文，不使用网站通用描述替代。
+
+前后端配置独立，作者、描述与规范域名应保持一致。使用外部 `application.properties` / `application.yml` 启动时，将对应 `app.site.*` 项写入该外部文件；仅修改源码中的 `application.yml` 不会覆盖已指定的外部配置。外部配置修改后重启后端。
 
 文件路径配置说明：
 
@@ -490,11 +502,25 @@ WantedBy=multi-user.target
 确保 Nginx 配置正确指向生产路径：
 
 - 前端根目录：`root /opt/myblog/dist`
+- 首页精确路由 `location = /` 代理到 `http://127.0.0.1:8081/api/seo/home`，输出带正文的 HTML；其余前端路由继续使用静态目录及 SPA 回退。
 - 后端代理：`proxy_pass http://127.0.0.1:8081`
 - 图片目录：`alias /opt/myblog/static/images/`
 - 附件目录：`alias /opt/myblog/static/attachments/`
 - 文档目录：`alias /opt/myblog/docs/`
 - `/api/docs-static/` 和 `/docs-static/` 应直接用 Nginx `alias` 暴露文档目录，避免大文件经后端代理触发 Nginx proxy 临时目录权限或缓冲问题。
+
+首页代理示例（放在对应站点的 `server` 块内）：
+
+```nginx
+location = / {
+    proxy_pass http://127.0.0.1:8081/api/seo/home;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
+部署后直接读取 `/` 的响应 HTML，应包含配置中的作者身份、推荐分类/文章链接，以及唯一的首页 canonical；不能仅用浏览器执行 JavaScript 后的 DOM 验收。生产环境将 `app.site.base-url` 和前端 `homeUrl` 配成同一公开首页地址。
 
 ```bash
 nginx -t

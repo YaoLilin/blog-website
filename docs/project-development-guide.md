@@ -150,7 +150,11 @@
 | `logging.logback.rollingpolicy.*` | Logback 日志滚动策略。归档文件使用相对路径 `log/app.%d{yyyy-MM-dd}.%i.gz`；单文件上限 50MB、保留 30 天、归档总量上限 1GB |
 | `app.site.base-url` | 站点对外公开访问地址，用于 sitemap、canonical、IndexNow |
 | `app.site.name` | 站点名称，用于 SEO 标题 |
-| `app.site.author` | 站点作者，用于结构化数据 |
+| `app.site.author` | 首页和文章的 author meta、文章 JSON-LD 作者 |
+| `app.site.author-alias` | 首页作者英文身份，与站点名称组合为正文主标题 |
+| `app.site.description` | 首页 description 和 OG description |
+| `app.site.home-title` | 首页 title 和 OG title；未配置时使用站点名称 |
+| `app.site.introduction` | 首页正文身份介绍；未配置时使用网站描述 |
 | `app.index-now.enabled` | 是否启用 IndexNow |
 | `app.index-now.key` | IndexNow key |
 | `app.index-now.endpoint` | IndexNow 提交地址，默认 Bing |
@@ -528,9 +532,11 @@ SEO 由后端和 Nginx 配合：
 - `/api/robots.txt` 生成 robots 文件。
 - `/api/sitemap.xml` 根据分类和文章生成站点地图。
 - `/api/seo/articles/{id}` 按文章 ID 输出 HTML。
+- `/api/seo/home` 输出首页 HTML，使用与前端首页相同的推荐分类、推荐文章和最近 10 篇文章数据；原始响应含 `YaoLilin` / `姚礼林` 身份介绍、可抓取链接和文章摘要，不依赖 JavaScript 才产生正文。
 - `/api/seo/articles/view?path=...` 按文件路径输出 HTML。
 - Nginx 将 `/robots.txt`、`/sitemap.xml` 和 `/articles/**` 代理到后端 SEO 接口；SEO HTML 必须保留前端入口脚本，使 React 在浏览器加载后接管文章页面。
 - 前端页面使用 `react-helmet-async` 设置标题和描述。
+- Nginx 使用 `location = /` 将首页代理至 `/api/seo/home`；保留前端入口脚本，由 React 接管交互。其他 SPA 路由不注入首页正文。后端首页 canonical 来自 `app.site.base-url`，末尾规范为单个 `/`；前端由 `SITE_CONFIG.homeUrl` 配置，两者应指向同一公开首页地址。
 
 ### 7.1 搜索引擎发现文章的机制
 
@@ -556,10 +562,19 @@ SEO 由后端和 Nginx 配合：
   - `GET /seo/articles/{id}`
   - `GET /seo/articles/view?path=...`
   - 用于输出搜索引擎友好的文章 HTML。
+- `SeoHomeController`
+  - `GET /seo/home`，允许匿名 GET，响应缓存时间 5 分钟。
+  - 复用 `CategoryService.getHomeCategories()`、`ArticleService.getRecommended()`、`ArticleService.getRecent(10)`，通过读数据源获取内容。
 - `SeoHtmlService`
   - 从前端 `dist/index.html` 作为壳页面注入 SEO 内容。
   - 为文章生成标题、描述、canonical、OG 和 JSON-LD。
   - 对 Markdown 做基础服务端渲染，保证搜索引擎在不执行前端脚本时也能读到正文。
+  - 首页和文章共用 HTML 壳注入逻辑，注入前清理旧 title、description、OG 和 canonical，避免重复标签；首页动态文本按 HTML 转义。
+- 前端 `WelcomePage` / `HomeMetadata`
+  - 站点作者、英文身份、名称、首页标题、介绍、描述和 canonical 由 `frontend/src/config/site.ts` 配置，`WelcomePage` 不内置身份文案。
+  - `frontend/index.html` 的作者、描述与标题使用站点配置占位符，由 Vite 在开发请求及构建时转义注入，构建产物中不保留占位符。
+  - 后端首页作者及文案来自 `app.site.*`，不再在 Java 中内置作者或网站描述。外部配置文件启动时，新增配置须写入实际加载的外部文件。
+  - 浏览器接管后更新并去重首页 description、OG、canonical；离开首页时清理首页专属标签，避免文章页保留首页 canonical。
 - 前端 `ArticlePage`
   - 文章 API 的只读 `description` 字段由 `ArticleSummary` 从正文生成：去除注释、代码块、图片及格式标记，保留链接文字，最多 160 个 Unicode 字符；正文为空时返回无可用摘要提示。
   - 服务端 SEO HTML 的 description、OG description 和 JSON-LD description 均使用同一摘要，输出前清除壳页面中的旧 description 和文章 OG 标签。

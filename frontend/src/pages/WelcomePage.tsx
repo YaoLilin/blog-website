@@ -1,6 +1,5 @@
 import { useEffect, useState, useMemo } from 'react'
 import { Link, useLoaderData } from 'react-router-dom'
-import { Helmet } from 'react-helmet-async'
 import { Calendar, ExternalLink } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -14,6 +13,7 @@ import bgImage from '../assets/bg.jpg'
 import shipImage from '../assets/ship.jpeg'
 import weaverImage from '../assets/weaver.png'
 import { SITE_CONFIG } from '../config/site'
+import { HomeMetadata } from '../components/HomeMetadata'
 
 export interface HomeLoaderData {
   allCategories: Category[]
@@ -105,16 +105,17 @@ export function WelcomePage() {
 
   return (
     <>
-      <Helmet>
-        <title>首页 - {SITE_CONFIG.name}</title>
-        <meta name="description" content={SITE_CONFIG.description} />
-      </Helmet>
+      <HomeMetadata />
       <div>
       <div className="w-full h-[66.67vh] overflow-hidden pointer-events-none">
         <img src={bgImage} alt="" className="w-full h-full object-cover" />
       </div>
 
       <div className="container mx-auto px-3 max-w-5xl mb-12 mt-10">
+        <header className="mb-8">
+          <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">{SITE_CONFIG.homeHeading}</h1>
+          <p className="mt-3 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">{SITE_CONFIG.introduction}</p>
+        </header>
         <div className="relative overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
           <div className="flex items-center justify-between px-5 py-5 md:px-7 md:py-7">
             <div className="flex-1 min-w-0">

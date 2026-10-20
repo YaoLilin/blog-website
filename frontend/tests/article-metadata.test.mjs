@@ -4,10 +4,18 @@ import { createServer } from 'node:http'
 import { resolve } from 'node:path'
 import { test } from 'node:test'
 import { chromium } from 'playwright'
+import { transformWithEsbuild } from 'vite'
 
 test('article metadata stays unique across server HTML and client navigation', async () => {
   const dist = resolve('dist')
   const shell = await readFile(resolve(dist, 'index.html'), 'utf8')
+  const siteSource = await readFile(resolve('src/config/site.ts'), 'utf8')
+  const transformed = await transformWithEsbuild(siteSource, 'site.ts')
+  const { SITE_CONFIG } = await import(`data:text/javascript;base64,${Buffer.from(transformed.code).toString('base64')}`)
+  assert.ok(!shell.includes('%SITE_'), '构建产物不能残留站点配置占位符')
+  assert.ok(shell.includes(`<title>${SITE_CONFIG.homeTitle}</title>`))
+  assert.ok(shell.includes(`name="author" content="${SITE_CONFIG.author}（${SITE_CONFIG.authorAlias}）"`))
+  assert.ok(shell.includes(`name="description" content="${SITE_CONFIG.description}"`))
   const articles = [152, 153].map(id => ({
     id, title: `测试文章${id}`, seoTitle: `测试分类 > 测试文章${id}`,
     content: `## 开发环境\n文章${id}的正文摘要。\n![](/empty.png)\n![已有说明](/named.png)`,
@@ -35,7 +43,9 @@ test('article metadata stays unique across server HTML and client navigation', a
         const meta = article ? `<meta name="description" content="${article.description}">
           <meta property="og:description" content="${article.description}">` : ''
         res.setHeader('Content-Type', 'text/html')
-        res.end(shell.replace('</head>', `${meta}</head>`))
+        const homeMeta = url.pathname === '/' ? '<link rel="canonical" href="https://old.example/">'
+          + '<link rel="canonical" href="https://yaolilin.com/">' : ''
+        res.end(shell.replace('</head>', `${meta}${homeMeta}</head>`))
       }
     } catch {
       res.writeHead(404).end()
@@ -54,7 +64,7 @@ test('article metadata stays unique across server HTML and client navigation', a
       }, article.description)
       const titles = await page.locator('head title').allTextContents()
       assert.equal(titles.length, 1, '文章页只能有一个 title')
-      assert.equal(titles[0], `${article.seoTitle} - 姚礼林的博客`)
+      assert.equal(titles[0], `${article.seoTitle} - ${SITE_CONFIG.name}`)
       assert.equal(await page.locator('img[src="/empty.png"]').getAttribute('alt'), '开发环境配图')
       assert.equal(await page.locator('img[src="/named.png"]').getAttribute('alt'), '已有说明')
       for (const key of ['description', 'og:description', 'og:title', 'og:type']) {
@@ -64,8 +74,19 @@ test('article metadata stays unique across server HTML and client navigation', a
         if (key.includes('description')) assert.equal(values[0], article.description)
       }
     }
-    await page.goto(`${base}/articles/152`)
+    await page.goto(base)
+    await page.waitForFunction(title => document.title === title, SITE_CONFIG.homeTitle)
+    assert.equal(await page.locator('head title').count(), 1)
+    assert.equal(await page.locator('head meta[name="description"]').count(), 1)
+    assert.equal(await page.locator('head link[rel="canonical"]').count(), 1)
+    assert.equal(await page.locator('head link[rel="canonical"]').getAttribute('href'), SITE_CONFIG.homeUrl)
+    assert.equal(await page.locator('h1').innerText(), SITE_CONFIG.homeHeading)
+    await page.locator('a[href="/articles/152"]').first().click()
+    await page.waitForURL(`${base}/articles/152`)
     await verify(articles[0])
+    assert.equal(await page.locator('head meta[name="author"]').count(), 1)
+    assert.equal(await page.locator('head meta[name="author"]').getAttribute('content'), `${SITE_CONFIG.author}（${SITE_CONFIG.authorAlias}）`)
+    assert.equal(await page.locator('head link[rel="canonical"][href="https://yaolilin.com/"]').count(), 0)
     // These links use React Router, so no document reload hides stale metadata.
     await page.getByRole('link', { name: '测试分类', exact: true }).click()
     await page.waitForURL(`${base}/categories/1`)

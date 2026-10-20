@@ -2,6 +2,7 @@ package com.blog.myblog.service;
 
 import com.blog.myblog.dto.ArticleDto;
 import com.blog.myblog.dto.CategoryDto;
+import com.blog.myblog.dto.HomeSeoDto;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -10,6 +11,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -19,6 +21,78 @@ class SeoHtmlServiceTest {
 
     @TempDir
     private Path tempDir;
+
+    @Test
+    void homeHtmlContainsIdentityRealLinksAndOneCanonicalBeforeJavaScript() throws Exception {
+        Files.writeString(tempDir.resolve("index.html"), """
+                <html><head><title>博客</title><meta name="description" content="旧摘要">
+                <link rel="canonical" href="https://old.example/">
+                <meta property="og:title" content="旧标题"></head>
+                <body><div id="root"></div><script type="module" src="/assets/app.js"></script></body></html>
+                """);
+        SeoHtmlService service = new SeoHtmlService();
+        ReflectionTestUtils.setField(service, "frontendDistPath", tempDir.toString());
+        ReflectionTestUtils.setField(service, "siteName", "姚礼林的博客");
+        ReflectionTestUtils.setField(service, "siteAuthorAlias", "YaoLilin");
+        ReflectionTestUtils.setField(service, "siteIntroduction", "我是姚礼林（YaoLilin），分享开发经验。");
+        ReflectionTestUtils.setField(service, "siteBaseUrl", "https://yaolilin.com/");
+        CategoryDto category = new CategoryDto();
+        category.setId(7L);
+        category.setName("开发 & 实践");
+        ArticleDto article = article("<script>alert(1)</script>");
+        article.setId(73L);
+        article.setContent("真实文章正文摘要");
+
+        String html = service.renderHomePage(new HomeSeoDto(List.of(category), List.of(article), List.of(article)));
+
+        assertTrue(html.contains("<h1>YaoLilin · 姚礼林的博客</h1>"));
+        assertTrue(html.contains("我是姚礼林（YaoLilin）"));
+        assertTrue(html.contains("href=\"/articles/73\""));
+        assertTrue(html.contains("href=\"/categories/7\""));
+        assertTrue(html.contains("开发 &amp; 实践"));
+        assertTrue(html.contains("真实文章正文摘要"));
+        assertTrue(html.contains("&lt;script&gt;alert(1)&lt;/script&gt;"));
+        assertTrue(html.contains("<link rel=\"canonical\" href=\"https://yaolilin.com/\" />"));
+        assertEquals(1, Pattern.compile("rel=\"canonical\"").matcher(html).results().count());
+        assertEquals(1, Pattern.compile("<title>").matcher(html).results().count());
+        assertEquals(1, Pattern.compile("name=\"description\"").matcher(html).results().count());
+        assertTrue(html.contains("src=\"/assets/app.js\""));
+        assertTrue(!html.contains("old.example") && !html.contains("旧摘要"));
+
+        String articleHtml = service.renderArticlePage(article, "https://yaolilin.com/articles/73");
+        assertEquals(1, Pattern.compile("rel=\"canonical\"").matcher(articleHtml).results().count());
+        assertTrue(articleHtml.contains("href=\"https://yaolilin.com/articles/73\""));
+        assertTrue(!articleHtml.contains("href=\"https://yaolilin.com/\""));
+    }
+
+    @Test
+    void homeAndArticleUseConfiguredAuthorAndHomeDescription() {
+        SeoHtmlService service = new SeoHtmlService();
+        ReflectionTestUtils.setField(service, "frontendDistPath", tempDir.resolve("missing").toString());
+        ReflectionTestUtils.setField(service, "siteName", "配置站点");
+        ReflectionTestUtils.setField(service, "siteAuthor", "新作者\" & 测试");
+        ReflectionTestUtils.setField(service, "siteAuthorAlias", "NewAuthor");
+        ReflectionTestUtils.setField(service, "homeTitle", "自定义首页标题");
+        ReflectionTestUtils.setField(service, "siteDescription", "配置的网站描述 <安全>");
+        ReflectionTestUtils.setField(service, "siteIntroduction", "可配置的作者介绍");
+        ReflectionTestUtils.setField(service, "siteBaseUrl", "https://configured.example///");
+
+        String html = service.renderHomePage(new HomeSeoDto(List.of(), List.of(), List.of()));
+
+        assertTrue(html.contains("<title>自定义首页标题</title>"));
+        assertTrue(html.contains("name=\"author\" content=\"新作者&quot; &amp; 测试\""));
+        assertTrue(html.contains("name=\"description\" content=\"配置的网站描述 &lt;安全&gt;\""));
+        assertTrue(html.contains("<h1>NewAuthor · 配置站点</h1>"));
+        assertTrue(html.contains("可配置的作者介绍"));
+        assertTrue(html.contains("href=\"https://configured.example/\""));
+        assertTrue(!html.contains("姚礼林") && !html.contains("YaoLilin"));
+
+        ArticleDto article = article("文章标题");
+        article.setContent("文章自己的正文摘要");
+        String articleHtml = service.renderArticlePage(article, "https://configured.example/articles/75");
+        assertTrue(articleHtml.contains("name=\"author\" content=\"新作者&quot; &amp; 测试\""));
+        assertTrue(articleHtml.contains("name=\"description\" content=\"文章自己的正文摘要\""));
+    }
 
     @Test
     void articleApiAndSeoHtmlShareOneSummaryWithoutDuplicateMeta() throws Exception {
